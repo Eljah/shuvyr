@@ -38,6 +38,8 @@ public class TonePracticeActivity extends AppCompatActivity {
     private ToneSample referenceSample;
     private ToneSample userSample;
 
+    private android.media.MediaPlayer mediaPlayer;
+
     private PitchAnalyzer pitchAnalyzer;
     private final List<Float> userPitch = new ArrayList<>();
 
@@ -91,6 +93,35 @@ public class TonePracticeActivity extends AppCompatActivity {
     private void playReference() {
         visualizerView.setReferenceData(referenceSample.getPitchHz());
         visualizerView.setUserData(null);
+        playReferenceAudio();
+    }
+
+    private void playReferenceAudio() {
+        stopReferenceAudio();
+        if (targetSyllable == null) {
+            return;
+        }
+        mediaPlayer = android.media.MediaPlayer.create(this, targetSyllable.getAudioResId());
+        if (mediaPlayer == null) {
+            return;
+        }
+        mediaPlayer.setOnCompletionListener(new android.media.MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(android.media.MediaPlayer mp) {
+                stopReferenceAudio();
+            }
+        });
+        mediaPlayer.start();
+    }
+
+    private void stopReferenceAudio() {
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop();
+            }
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
     }
 
     private void recordUser() {
@@ -207,5 +238,6 @@ public class TonePracticeActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         pitchAnalyzer.stop();
+        stopReferenceAudio();
     }
 }
