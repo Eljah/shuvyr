@@ -74,10 +74,20 @@ jobs:
               `Found ${matching.length} artifacts for ${artifactName}. Deleting ${toDelete.length}.`
             );
             for (const artifact of toDelete) {
-              await github.rest.actions.deleteArtifact({
-                owner,
-                repo,
-                artifact_id: artifact.id,
-              });
-              core.info(`Deleted artifact ${artifact.id}.`);
+              try {
+                await github.rest.actions.deleteArtifact({
+                  owner,
+                  repo,
+                  artifact_id: artifact.id,
+                });
+                core.info(`Deleted artifact ${artifact.id}.`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.warning(
+                    `Artifact ${artifact.id} already deleted or expired; skipping.`
+                  );
+                  continue;
+                }
+                throw error;
+              }
             }
