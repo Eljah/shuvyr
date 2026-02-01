@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -38,7 +39,8 @@ public class TonePracticeActivity extends AppCompatActivity {
     private ToneSample referenceSample;
     private ToneSample userSample;
 
-    private android.media.MediaPlayer mediaPlayer;
+    private TextToSpeech textToSpeech;
+    private boolean isTtsReady = false;
 
     private PitchAnalyzer pitchAnalyzer;
     private final List<Float> userPitch = new ArrayList<>();
@@ -62,6 +64,18 @@ public class TonePracticeActivity extends AppCompatActivity {
 
         targetSyllable = new VietnameseSyllable("má", "sắc", R.raw.ma2);
         tvTarget.setText(targetSyllable.getText());
+
+        textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    Locale vietnameseLocale = Locale.forLanguageTag("vi-VN");
+                    int languageStatus = textToSpeech.setLanguage(vietnameseLocale);
+                    isTtsReady = languageStatus != TextToSpeech.LANG_MISSING_DATA
+                            && languageStatus != TextToSpeech.LANG_NOT_SUPPORTED;
+                }
+            }
+        }, "com.google.android.tts");
 
         referenceSample = createSimpleReferenceSample();
         visualizerView.setReferenceData(referenceSample.getPitchHz());
@@ -97,30 +111,19 @@ public class TonePracticeActivity extends AppCompatActivity {
     }
 
     private void playReferenceAudio() {
-        stopReferenceAudio();
         if (targetSyllable == null) {
             return;
         }
-        mediaPlayer = android.media.MediaPlayer.create(this, targetSyllable.getAudioResId());
-        if (mediaPlayer == null) {
+        if (!isTtsReady || textToSpeech == null) {
             return;
         }
-        mediaPlayer.setOnCompletionListener(new android.media.MediaPlayer.OnCompletionListener() {
-            @Override
-            public void onCompletion(android.media.MediaPlayer mp) {
-                stopReferenceAudio();
-            }
-        });
-        mediaPlayer.start();
+        textToSpeech.stop();
+        textToSpeech.speak(targetSyllable.getText(), TextToSpeech.QUEUE_FLUSH, null, "reference-utterance");
     }
 
     private void stopReferenceAudio() {
-        if (mediaPlayer != null) {
-            if (mediaPlayer.isPlaying()) {
-                mediaPlayer.stop();
-            }
-            mediaPlayer.release();
-            mediaPlayer = null;
+        if (textToSpeech != null) {
+            textToSpeech.stop();
         }
     }
 
@@ -182,7 +185,9 @@ public class TonePracticeActivity extends AppCompatActivity {
         final SpeechRecognizer recognizer = SpeechRecognizer.createSpeechRecognizer(this);
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, new Locale("vi", "VN").toString());
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "vi-VN");
+        intent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true);
 
         recognizer.setRecognitionListener(new RecognitionListener() {
             @Override
@@ -239,5 +244,9 @@ public class TonePracticeActivity extends AppCompatActivity {
         super.onDestroy();
         pitchAnalyzer.stop();
         stopReferenceAudio();
+        if (textToSpeech != null) {
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
     }
 }
