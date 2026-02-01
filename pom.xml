@@ -9,11 +9,53 @@
     <packaging>apk</packaging>
 
     <properties>
-        <android.sdk.platform>34</android.sdk.platform>
+        <android.sdk.platform>28</android.sdk.platform>
         <java.version>1.8</java.version>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>android</groupId>
+            <artifactId>android</artifactId>
+            <version>28</version>
+            <scope>system</scope>
+            <systemPath>${env.ANDROID_HOME}/platforms/android-28/android.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.android.support</groupId>
+            <artifactId>appcompat-v7</artifactId>
+            <version>28.0.0</version>
+            <type>aar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.android.support</groupId>
+            <artifactId>recyclerview-v7</artifactId>
+            <version>28.0.0</version>
+            <type>aar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.android.support</groupId>
+            <artifactId>support-annotations</artifactId>
+            <version>28.0.0</version>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>google</id>
+            <name>Google Maven</name>
+            <url>https://maven.google.com</url>
+        </repository>
+    </repositories>
+
     <build>
+        <extensions>
+            <extension>
+                <groupId>com.simpligility.maven.plugins</groupId>
+                <artifactId>android-maven-plugin</artifactId>
+                <version>4.5.0</version>
+            </extension>
+        </extensions>
         <plugins>
             <plugin>
                 <groupId>com.simpligility.maven.plugins</groupId>
@@ -22,8 +64,16 @@
                 <configuration>
                     <sdk>
                         <platform>${android.sdk.platform}</platform>
+                        <buildTools>28.0.3</buildTools>
                     </sdk>
                     <deleteConflictingFiles>true</deleteConflictingFiles>
+                    <failOnDuplicatePackages>false</failOnDuplicatePackages>
+                    <dexCoreLibrary>true</dexCoreLibrary>
+                    <artifactSet>
+                        <excludes>
+                            <exclude>android:android</exclude>
+                        </excludes>
+                    </artifactSet>
                 </configuration>
             </plugin>
         </plugins>

@@ -2,7 +2,7 @@ package com.example.tonetrainer;
 
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.appcompat.app.AppCompatActivity;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import com.example.tonetrainer.demo.ToneDemoActivity;
 import com.example.tonetrainer.practice.TonePracticeActivity;
