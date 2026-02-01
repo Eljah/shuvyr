@@ -5,6 +5,10 @@ on:
     branches: ["**"]
   pull_request:
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
