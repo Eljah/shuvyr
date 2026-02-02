@@ -60,6 +60,7 @@ public class TonePracticeActivity extends AppCompatActivity {
     private final List<Float> userPitch = new ArrayList<>();
     private boolean isRecording = false;
     private boolean shouldRecognizeSpeech = false;
+    private String referenceFileUtteranceId;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable stopRecordingRunnable = new Runnable() {
@@ -162,7 +163,7 @@ public class TonePracticeActivity extends AppCompatActivity {
             return;
         }
 
-        final String utteranceId = "reference-file-" + System.currentTimeMillis();
+        referenceFileUtteranceId = "reference-file-" + System.currentTimeMillis();
         textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override
             public void onStart(String utteranceId) {
@@ -170,19 +171,21 @@ public class TonePracticeActivity extends AppCompatActivity {
 
             @Override
             public void onDone(String utteranceId) {
-                analyzeReferenceFile(outputFile);
+                if (utteranceId != null && utteranceId.equals(referenceFileUtteranceId)) {
+                    analyzeReferenceFile(outputFile);
+                }
             }
 
             @Override
             public void onError(String utteranceId) {
-                if (!outputFile.delete()) {
-                    outputFile.deleteOnExit();
+                if (utteranceId != null && utteranceId.equals(referenceFileUtteranceId)) {
+                    deleteTempFile(outputFile);
                 }
             }
         });
 
         Bundle params = new Bundle();
-        textToSpeech.synthesizeToFile(targetSyllable.getText(), params, outputFile, utteranceId);
+        textToSpeech.synthesizeToFile(targetSyllable.getText(), params, outputFile, referenceFileUtteranceId);
     }
 
     private void analyzeReferenceFile(final File outputFile) {
