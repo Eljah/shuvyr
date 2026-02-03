@@ -13,6 +13,7 @@ import java.util.List;
 public class SpectrogramView extends View {
     private static final int MAX_FRAMES = 60;
     private static final int MAX_BINS = 64;
+    private static final float MAX_FREQUENCY_HZ = 2000f;
     private static final float TEXT_SIZE_SP = 12f;
 
     private final Paint cellPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -59,7 +60,8 @@ public class SpectrogramView extends View {
         this.fftBins = magnitudes.length;
         this.frameDurationMs = (fftSize / (float) sampleRate) * 1000f;
 
-        float[] downsampled = downsample(magnitudes, MAX_BINS);
+        float[] limitedMagnitudes = limitMagnitudesToMaxFrequency(magnitudes, sampleRate);
+        float[] downsampled = downsample(limitedMagnitudes, MAX_BINS);
         if (frames.size() >= MAX_FRAMES) {
             frames.remove(0);
         }
@@ -120,7 +122,7 @@ public class SpectrogramView extends View {
         canvas.drawLine(left, top, left, bottom, axisPaint);
         canvas.drawLine(left, bottom, right, bottom, axisPaint);
 
-        float maxFrequency = sampleRate / 2f;
+        float maxFrequency = Math.min(sampleRate / 2f, MAX_FREQUENCY_HZ);
         canvas.drawText("Hz", 8, top + textPaint.getTextSize(), textPaint);
         canvas.drawText("ms", right - 40, bottom + textPaint.getTextSize() + 8, textPaint);
 
@@ -136,6 +138,22 @@ public class SpectrogramView extends View {
         float totalMs = frameDurationMs * frames.size();
         canvas.drawText(String.format("%.0f", totalMs), right - 60, bottom + textPaint.getTextSize() + 8, textPaint);
         canvas.drawText("0", left, bottom + textPaint.getTextSize() + 8, textPaint);
+    }
+
+    private float[] limitMagnitudesToMaxFrequency(float[] magnitudes, int sampleRate) {
+        float nyquist = sampleRate / 2f;
+        float maxFrequency = Math.min(nyquist, MAX_FREQUENCY_HZ);
+        if (maxFrequency >= nyquist) {
+            return magnitudes.clone();
+        }
+        float binHz = nyquist / magnitudes.length;
+        int maxBin = Math.min(magnitudes.length, (int) Math.ceil(maxFrequency / binHz));
+        if (maxBin <= 0) {
+            maxBin = 1;
+        }
+        float[] limited = new float[maxBin];
+        System.arraycopy(magnitudes, 0, limited, 0, maxBin);
+        return limited;
     }
 
     private float[] downsample(float[] magnitudes, int targetBins) {
