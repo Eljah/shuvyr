@@ -9,8 +9,8 @@
     <packaging>apk</packaging>
 
     <properties>
-        <android.sdk.platform>34</android.sdk.platform>
-        <android.build.tools>34.0.0</android.build.tools>
+        <android.platform.version>28</android.platform.version>
+        <android.build.tools>28.0.3</android.build.tools>
         <java.version>1.8</java.version>
     </properties>
 
@@ -18,9 +18,9 @@
         <dependency>
             <groupId>android</groupId>
             <artifactId>android</artifactId>
-            <version>34</version>
+            <version>28</version>
             <scope>system</scope>
-            <systemPath>${env.ANDROID_HOME}/platforms/android-${android.sdk.platform}/android.jar</systemPath>
+            <systemPath>${env.ANDROID_HOME}/platforms/android-${android.platform.version}/android.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>com.android.support</groupId>
@@ -64,7 +64,7 @@
                 <version>4.5.0</version>
                 <configuration>
                     <sdk>
-                        <platform>${android.sdk.platform}</platform>
+                        <platform>28</platform>
                         <buildTools>${android.build.tools}</buildTools>
                     </sdk>
                     <deleteConflictingFiles>true</deleteConflictingFiles>
