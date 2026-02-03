@@ -53,25 +53,25 @@ jobs:
         with:
           name: vietnamese-tone-trainer-apk
           path: target/*.apk
-
+      
       - name: Cleanup old APK artifacts
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
         uses: actions/github-script@v7
         with:
           script: |
-            const artifactName = "vietnamese-tone-trainer-apk";
+            const artifactNames = ["vietnamese-tone-trainer-apk"];
             const { owner, repo } = context.repo;
             const artifacts = await github.paginate(
               github.rest.actions.listArtifactsForRepo,
               { owner, repo, per_page: 100 }
             );
             const matching = artifacts
-              .filter((artifact) => artifact.name === artifactName)
+              .filter((artifact) => artifactNames.includes(artifact.name))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             const toDelete = matching.slice(3);
 
             core.info(
-              `Found ${matching.length} artifacts for ${artifactName}. Deleting ${toDelete.length}.`
+              `Found ${matching.length} artifacts for ${artifactNames.join(", ")}. Deleting ${toDelete.length}.`
             );
             for (const artifact of toDelete) {
               try {
