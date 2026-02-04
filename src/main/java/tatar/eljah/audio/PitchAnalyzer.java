@@ -51,6 +51,10 @@ public class PitchAnalyzer {
                 short[] buffer = new short[minBufferSize];
 
                 try {
+                    if (record.getState() != AudioRecord.STATE_INITIALIZED) {
+                        running = false;
+                        return;
+                    }
                     record.startRecording();
                     while (running) {
                         int read = record.read(buffer, 0, buffer.length);
@@ -66,6 +70,8 @@ public class PitchAnalyzer {
                         }
                     }
                     record.stop();
+                } catch (IllegalStateException ignored) {
+                    running = false;
                 } finally {
                     record.release();
                 }
