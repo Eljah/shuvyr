@@ -91,40 +91,45 @@ jobs:
           name: vietnamese-tone-trainer-aab
           path: target/*.aab
 
-      - name: Cleanup old AAB artifacts
+      - name: Cleanup old APK/AAB artifacts
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)
         uses: actions/github-script@v7
         with:
           script: |
-            const artifactNames = ["vietnamese-tone-trainer-aab"];
+            const artifactNames = [
+              "vietnamese-tone-trainer-apk",
+              "vietnamese-tone-trainer-aab",
+            ];
             const { owner, repo } = context.repo;
             const artifacts = await github.paginate(
               github.rest.actions.listArtifactsForRepo,
               { owner, repo, per_page: 100 }
             );
-            const matching = artifacts
-              .filter((artifact) => artifactNames.includes(artifact.name))
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            const toDelete = matching.slice(3);
+            for (const artifactName of artifactNames) {
+              const matching = artifacts
+                .filter((artifact) => artifact.name === artifactName)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const toDelete = matching.slice(3);
 
-            core.info(
-              `Found ${matching.length} artifacts for ${artifactNames.join(", ")}. Deleting ${toDelete.length}.`
-            );
-            for (const artifact of toDelete) {
-              try {
-                await github.rest.actions.deleteArtifact({
-                  owner,
-                  repo,
-                  artifact_id: artifact.id,
-                });
-                core.info(`Deleted artifact ${artifact.id}.`);
-              } catch (error) {
-                if (error.status === 404) {
-                  core.warning(
-                    `Artifact ${artifact.id} already deleted or expired; skipping.`
-                  );
-                  continue;
+              core.info(
+                `Found ${matching.length} artifacts for ${artifactName}. Deleting ${toDelete.length}.`
+              );
+              for (const artifact of toDelete) {
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner,
+                    repo,
+                    artifact_id: artifact.id,
+                  });
+                  core.info(`Deleted artifact ${artifact.id}.`);
+                } catch (error) {
+                  if (error.status === 404) {
+                    core.warning(
+                      `Artifact ${artifact.id} already deleted or expired; skipping.`
+                    );
+                    continue;
+                  }
+                  throw error;
                 }
-                throw error;
               }
             }
