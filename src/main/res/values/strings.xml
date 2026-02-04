@@ -18,7 +18,6 @@
     <string name="label_select_base_vowel">Base vowel</string>
     <string name="label_select_tone">Tone</string>
     <string name="label_select_vowel">Vowel</string>
-    <string name="label_histogram_section">Audio histogram (reference sample)</string>
     <string name="btn_play_pair">Play pair</string>
     <string name="label_options">Options: %1$s / %2$s</string>
     <string name="label_first_choice">First syllable</string>

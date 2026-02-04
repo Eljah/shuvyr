@@ -16,7 +16,8 @@ import android.widget.TextView;
 import android.support.v7.app.AppCompatActivity;
 
 import tatar.eljah.R;
-import tatar.eljah.ui.HistogramView;
+import tatar.eljah.audio.PitchAnalyzer;
+import tatar.eljah.ui.SpectrogramView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,8 +25,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 
 public class SyllableDiscriminationActivity extends AppCompatActivity {
 
@@ -77,8 +80,9 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
     private TextView resultView;
     private Button playPairButton;
     private Button checkAnswerButton;
-    private HistogramView histogramView;
-    private Thread histogramThread;
+    private SpectrogramView spectrogramView;
+    private Thread spectrogramThread;
+    private PitchAnalyzer pitchAnalyzer;
 
     private TextToSpeech textToSpeech;
     private boolean isTtsReady = false;
@@ -113,12 +117,13 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
         resultView = findViewById(R.id.tv_discrimination_result);
         playPairButton = findViewById(R.id.btn_play_pair);
         checkAnswerButton = findViewById(R.id.btn_check_answer);
-        histogramView = findViewById(R.id.histogram_view);
+        spectrogramView = findViewById(R.id.spectrogramView);
 
         setupSpinners();
         updateModeUi();
         updateScore();
-        loadReferenceHistogram();
+        pitchAnalyzer = new PitchAnalyzer();
+        loadReferenceSpectrogram();
 
         textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override
@@ -150,8 +155,8 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (histogramThread != null) {
-            histogramThread.interrupt();
+        if (spectrogramThread != null) {
+            spectrogramThread.interrupt();
         }
         if (textToSpeech != null) {
             textToSpeech.shutdown();
@@ -299,30 +304,49 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
         scoreView.setText(getString(R.string.label_score, score));
     }
 
-    private void loadReferenceHistogram() {
-        histogramThread = new Thread(new Runnable() {
+    private void loadReferenceSpectrogram() {
+        spectrogramThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                float[] histogram = buildHistogramFromResource(R.raw.ma1);
-                if (histogram == null || Thread.currentThread().isInterrupted()) {
+                PcmData pcmData = decodeAudioResource(R.raw.ma1);
+                if (pcmData == null || Thread.currentThread().isInterrupted()) {
                     return;
                 }
+                final List<float[]> spectrumFrames = new ArrayList<>();
+                pitchAnalyzer.analyzePcm(
+                        pcmData.samples,
+                        pcmData.sampleRate,
+                        null,
+                        new PitchAnalyzer.SpectrumListener() {
+                            @Override
+                            public void onSpectrum(float[] magnitudes, int sampleRate) {
+                                spectrumFrames.add(magnitudes);
+                            }
+                        }
+                );
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        histogramView.setHistogram(histogram);
+                        if (spectrogramView == null) {
+                            return;
+                        }
+                        spectrogramView.clear();
+                        for (float[] frame : spectrumFrames) {
+                            spectrogramView.addSpectrumFrame(frame, pcmData.sampleRate, frame.length * 2);
+                        }
                     }
                 });
             }
         });
-        histogramThread.start();
+        spectrogramThread.start();
     }
 
-    private float[] buildHistogramFromResource(int resId) {
-        int bins = 32;
-        int[] counts = new int[bins];
+    private PcmData decodeAudioResource(int resId) {
         MediaExtractor extractor = new MediaExtractor();
         MediaCodec codec = null;
+        int sampleRate = 22050;
+        int channels = 1;
+        List<Short> samples = new ArrayList<>();
         try {
             AssetFileDescriptor afd = getResources().openRawResourceFd(resId);
             extractor.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
@@ -335,6 +359,12 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             extractor.selectTrack(trackIndex);
             MediaFormat format = extractor.getTrackFormat(trackIndex);
             String mime = format.getString(MediaFormat.KEY_MIME);
+            if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+            }
+            if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+            }
             if (mime == null) {
                 return null;
             }
@@ -370,24 +400,35 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
                     if (bufferInfo.size > 0) {
                         ByteBuffer outputBuffer = codec.getOutputBuffer(outputIndex);
                         if (outputBuffer != null) {
+                            outputBuffer.position(bufferInfo.offset);
+                            outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
                             outputBuffer.order(ByteOrder.LITTLE_ENDIAN);
-                            while (outputBuffer.remaining() >= 2) {
-                                short sample = outputBuffer.getShort();
-                                int amplitude = Math.abs(sample);
-                                int bin = (int) ((amplitude / 32768f) * bins);
-                                if (bin >= bins) {
-                                    bin = bins - 1;
+                            ShortBuffer shortBuffer = outputBuffer.asShortBuffer();
+                            short[] temp = new short[bufferInfo.size / 2];
+                            shortBuffer.get(temp);
+                            if (channels > 1) {
+                                for (int i = 0; i < temp.length; i += channels) {
+                                    samples.add(temp[i]);
                                 }
-                                counts[bin] += 1;
+                            } else {
+                                for (short value : temp) {
+                                    samples.add(value);
+                                }
                             }
                         }
                     }
                     codec.releaseOutputBuffer(outputIndex, false);
                 } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    // Format change ignored for histogram counting.
+                    MediaFormat outputFormat = codec.getOutputFormat();
+                    if (outputFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                        sampleRate = outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                    }
+                    if (outputFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                        channels = outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+                    }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (IOException ignored) {
             return null;
         } finally {
             extractor.release();
@@ -400,20 +441,14 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             }
         }
 
-        int max = 0;
-        for (int count : counts) {
-            if (count > max) {
-                max = count;
-            }
-        }
-        if (max == 0) {
+        if (samples.isEmpty()) {
             return null;
         }
-        float[] histogram = new float[bins];
-        for (int i = 0; i < bins; i++) {
-            histogram[i] = counts[i] / (float) max;
+        short[] pcmSamples = new short[samples.size()];
+        for (int i = 0; i < samples.size(); i++) {
+            pcmSamples[i] = samples.get(i);
         }
-        return histogram;
+        return new PcmData(pcmSamples, sampleRate);
     }
 
     private int selectAudioTrack(MediaExtractor extractor) {
@@ -426,5 +461,15 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             }
         }
         return -1;
+    }
+
+    private static class PcmData {
+        private final short[] samples;
+        private final int sampleRate;
+
+        private PcmData(short[] samples, int sampleRate) {
+            this.samples = samples;
+            this.sampleRate = sampleRate;
+        }
     }
 }
