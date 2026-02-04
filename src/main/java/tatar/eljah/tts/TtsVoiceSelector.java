@@ -17,12 +17,25 @@ public final class TtsVoiceSelector {
         if (context == null || textToSpeech == null || locale == null) {
             return;
         }
-        String genderPreference = TtsVoicePreferences.getVoiceGender(context);
-        if (TtsVoicePreferences.VOICE_GENDER_AUTO.equals(genderPreference)) {
-            return;
-        }
         Set<Voice> voices = textToSpeech.getVoices();
         if (voices == null || voices.isEmpty()) {
+            return;
+        }
+        String preferredVoiceName = TtsVoicePreferences.getVoiceName(context);
+        if (preferredVoiceName != null) {
+            for (Voice voice : voices) {
+                if (voice == null || voice.isNetworkConnectionRequired()) {
+                    continue;
+                }
+                if (preferredVoiceName.equals(voice.getName())) {
+                    textToSpeech.setVoice(voice);
+                    return;
+                }
+            }
+        }
+
+        String genderPreference = TtsVoicePreferences.getVoiceGender(context);
+        if (TtsVoicePreferences.VOICE_GENDER_AUTO.equals(genderPreference)) {
             return;
         }
         List<Voice> candidates = new ArrayList<>();
