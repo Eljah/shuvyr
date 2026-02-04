@@ -118,9 +118,7 @@
                         <configuration>
                             <skip>${aab.skip}</skip>
                             <target>
-                                <copy file="${project.build.directory}/${project.build.finalName}.ap_"
-                                      tofile="${project.build.directory}/${project.build.finalName}.ap_.zip"
-                                      overwrite="true" />
+                                <echo message="AAB build handled by scripts/build-aab.sh" />
                             </target>
                         </configuration>
                     </execution>
@@ -139,15 +137,8 @@
                         </goals>
                         <configuration>
                             <skip>${aab.skip}</skip>
-                            <executable>bundletool</executable>
+                            <executable>${project.basedir}/scripts/build-aab.sh</executable>
                             <workingDirectory>${project.basedir}</workingDirectory>
-                            <arguments>
-                                <argument>build-bundle</argument>
-                                <argument>--modules</argument>
-                                <argument>${project.build.directory}/${project.build.finalName}.ap_.zip</argument>
-                                <argument>--output</argument>
-                                <argument>${project.build.directory}/${project.build.finalName}.aab</argument>
-                            </arguments>
                         </configuration>
                     </execution>
                 </executions>
