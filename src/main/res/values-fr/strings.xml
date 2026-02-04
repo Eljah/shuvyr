@@ -26,9 +26,9 @@
     <string name="label_score">Score : %1$d</string>
     <string name="label_correct">Correct !</string>
     <string name="label_wrong">Ordre incorrect.</string>
-    <string name="label_no_round">Lisez d'abord une paire.</string>
+    <string name="label_no_round">Lisez d\'abord une paire.</string>
     <string name="label_not_enough_variants">Pas assez de variantes pour cette sélection.</string>
-    <string name="label_tts_not_ready">La synthèse vocale n'est pas prête.</string>
+    <string name="label_tts_not_ready">La synthèse vocale n\'est pas prête.</string>
     <string name="title_sound_mode">Discrimination des sons</string>
     <string name="title_tone_mode">Discrimination des tons</string>
     <string name="tone_result_match">La direction du ton correspond à la référence.</string>
