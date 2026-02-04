@@ -40,7 +40,9 @@
     <string name="title_voice_settings">Настройки голоса</string>
     <string name="label_voice_gender">Пол голоса</string>
     <string name="label_voice_gender_hint">Применяется, если выбранный синтезатор речи поддерживает мужские и женские голоса.</string>
+    <string name="label_voice_selection">Предпочитаемый голос</string>
     <string name="voice_gender_auto">Автоматически</string>
     <string name="voice_gender_male">Мужской</string>
     <string name="voice_gender_female">Женский</string>
+    <string name="voice_selection_auto">Автоматически</string>
 </resources>

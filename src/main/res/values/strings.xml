@@ -41,7 +41,9 @@
     <string name="title_voice_settings">Voice settings</string>
     <string name="label_voice_gender">Voice gender</string>
     <string name="label_voice_gender_hint">Applied when the selected text-to-speech engine provides gendered voices.</string>
+    <string name="label_voice_selection">Preferred voice</string>
     <string name="voice_gender_auto">Automatic</string>
     <string name="voice_gender_male">Male</string>
     <string name="voice_gender_female">Female</string>
+    <string name="voice_selection_auto">Automatic</string>
 </resources>

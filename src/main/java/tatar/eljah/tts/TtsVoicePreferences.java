@@ -6,6 +6,7 @@ import android.preference.PreferenceManager;
 
 public final class TtsVoicePreferences {
     public static final String PREF_VOICE_GENDER = "pref_voice_gender";
+    public static final String PREF_VOICE_NAME = "pref_voice_name";
     public static final String VOICE_GENDER_AUTO = "auto";
     public static final String VOICE_GENDER_MALE = "male";
     public static final String VOICE_GENDER_FEMALE = "female";
@@ -29,5 +30,23 @@ public final class TtsVoicePreferences {
         }
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         preferences.edit().putString(PREF_VOICE_GENDER, sanitizedValue).apply();
+    }
+
+    public static String getVoiceName(Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        String value = preferences.getString(PREF_VOICE_NAME, null);
+        if (value != null && value.trim().isEmpty()) {
+            return null;
+        }
+        return value;
+    }
+
+    public static void setVoiceName(Context context, String value) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        if (value == null || value.trim().isEmpty()) {
+            preferences.edit().remove(PREF_VOICE_NAME).apply();
+        } else {
+            preferences.edit().putString(PREF_VOICE_NAME, value).apply();
+        }
     }
 }
