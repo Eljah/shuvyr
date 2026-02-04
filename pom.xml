@@ -12,7 +12,30 @@
         <android.sdk.platform>34</android.sdk.platform>
         <android.build.tools>34.0.0</android.build.tools>
         <java.version>1.8</java.version>
+        <android.support.version>28.0.0</android.support.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.android.support</groupId>
+                <artifactId>appcompat-v7</artifactId>
+                <version>${android.support.version}</version>
+                <type>aar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.android.support</groupId>
+                <artifactId>recyclerview-v7</artifactId>
+                <version>${android.support.version}</version>
+                <type>aar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.android.support</groupId>
+                <artifactId>support-annotations</artifactId>
+                <version>${android.support.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -25,7 +48,7 @@
         <dependency>
             <groupId>com.android.support</groupId>
             <artifactId>appcompat-v7</artifactId>
-            <version>28.0.0</version>
+            <version>${android.support.version}</version>
             <type>aar</type>
             <exclusions>
                 <exclusion>
@@ -37,13 +60,13 @@
         <dependency>
             <groupId>com.android.support</groupId>
             <artifactId>recyclerview-v7</artifactId>
-            <version>28.0.0</version>
+            <version>${android.support.version}</version>
             <type>aar</type>
         </dependency>
         <dependency>
             <groupId>com.android.support</groupId>
             <artifactId>support-annotations</artifactId>
-            <version>28.0.0</version>
+            <version>${android.support.version}</version>
         </dependency>
     </dependencies>
 
