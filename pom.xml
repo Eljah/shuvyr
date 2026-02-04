@@ -104,7 +104,20 @@
             <name>Google Maven</name>
             <url>https://maven.google.com</url>
         </repository>
+        <repository>
+            <id>simpligility-public</id>
+            <name>Simpligility Public</name>
+            <url>https://repo.simpligility.org/content/groups/public/</url>
+        </repository>
     </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>simpligility-public</id>
+            <name>Simpligility Public</name>
+            <url>https://repo.simpligility.org/content/groups/public/</url>
+        </pluginRepository>
+    </pluginRepositories>
 
     <build>
         <extensions>
