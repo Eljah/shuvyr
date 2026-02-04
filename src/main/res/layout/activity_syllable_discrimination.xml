@@ -94,6 +94,13 @@
             android:layout_marginTop="12dp"
             android:text="@string/btn_play_pair" />
 
+        <Button
+            android:id="@+id/btn_repeat_pair"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_repeat_pair" />
+
         <TextView
             android:id="@+id/tv_discrimination_options"
             android:layout_width="match_parent"

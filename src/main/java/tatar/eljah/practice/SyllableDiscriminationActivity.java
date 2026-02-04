@@ -6,6 +6,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -79,6 +81,7 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
     private TextView scoreView;
     private TextView resultView;
     private Button playPairButton;
+    private Button repeatPairButton;
     private Button checkAnswerButton;
     private SpectrogramView spectrogramView;
     private Thread spectrogramThread;
@@ -92,6 +95,8 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
     private final Random random = new Random();
     private int score = 0;
     private String mode = MODE_SOUND;
+    private boolean hasAnswered = false;
+    private String lastPairText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,6 +121,7 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
         scoreView = findViewById(R.id.tv_discrimination_score);
         resultView = findViewById(R.id.tv_discrimination_result);
         playPairButton = findViewById(R.id.btn_play_pair);
+        repeatPairButton = findViewById(R.id.btn_repeat_pair);
         checkAnswerButton = findViewById(R.id.btn_check_answer);
         spectrogramView = findViewById(R.id.spectrogramView);
 
@@ -141,6 +147,13 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 playPair();
+            }
+        });
+
+        repeatPairButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                repeatPair();
             }
         });
 
@@ -221,10 +234,13 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
         boolean swap = random.nextBoolean();
         correctFirst = swap ? options.get(1) : options.get(0);
         correctSecond = swap ? options.get(0) : options.get(1);
+        lastPairText = correctFirst + " " + correctSecond;
+        hasAnswered = false;
+        checkAnswerButton.setEnabled(true);
 
         resultView.setText("");
-        textToSpeech.speak(correctFirst, TextToSpeech.QUEUE_FLUSH, null, "first");
-        textToSpeech.speak(correctSecond, TextToSpeech.QUEUE_ADD, null, "second");
+        speakPair();
+        generateSpectrogramForPair();
     }
 
     private List<String> buildOptions() {
@@ -288,6 +304,10 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             resultView.setText(R.string.label_no_round);
             return;
         }
+        if (hasAnswered) {
+            resultView.setText(R.string.label_already_scored);
+            return;
+        }
         String chosenFirst = String.valueOf(firstChoiceSpinner.getSelectedItem());
         String chosenSecond = String.valueOf(secondChoiceSpinner.getSelectedItem());
         if (correctFirst.equals(chosenFirst) && correctSecond.equals(chosenSecond)) {
@@ -297,6 +317,8 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             score -= 1;
             resultView.setText(R.string.label_wrong);
         }
+        hasAnswered = true;
+        checkAnswerButton.setEnabled(false);
         updateScore();
     }
 
@@ -339,6 +361,98 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             }
         });
         spectrogramThread.start();
+    }
+
+    private void repeatPair() {
+        if (correctFirst == null || correctSecond == null) {
+            resultView.setText(R.string.label_no_round);
+            return;
+        }
+        resultView.setText("");
+        speakPair();
+        generateSpectrogramForPair();
+    }
+
+    private void speakPair() {
+        if (textToSpeech == null || !isTtsReady) {
+            resultView.setText(R.string.label_tts_not_ready);
+            return;
+        }
+        textToSpeech.speak(correctFirst, TextToSpeech.QUEUE_FLUSH, null, "first");
+        textToSpeech.speak(correctSecond, TextToSpeech.QUEUE_ADD, null, "second");
+    }
+
+    private void generateSpectrogramForPair() {
+        if (!isTtsReady || textToSpeech == null || lastPairText == null) {
+            return;
+        }
+        final File outputFile;
+        try {
+            outputFile = File.createTempFile("pair_tts_", ".wav", getCacheDir());
+        } catch (IOException e) {
+            return;
+        }
+        final String expectedUtteranceId = "pair-spectrogram-" + System.currentTimeMillis();
+        textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+            @Override
+            public void onStart(String utteranceId) {
+            }
+
+            @Override
+            public void onDone(String utteranceId) {
+                if (utteranceId == null || !utteranceId.equals(expectedUtteranceId)) {
+                    return;
+                }
+                analyzeSpectrogramFile(outputFile);
+            }
+
+            @Override
+            public void onError(String utteranceId) {
+                if (utteranceId == null || !utteranceId.equals(expectedUtteranceId)) {
+                    return;
+                }
+                deleteTempFile(outputFile);
+            }
+        });
+        Bundle params = new Bundle();
+        textToSpeech.synthesizeToFile(lastPairText, params, outputFile, expectedUtteranceId);
+    }
+
+    private void analyzeSpectrogramFile(final File outputFile) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                PcmData pcmData = decodeAudioFile(outputFile);
+                deleteTempFile(outputFile);
+                if (pcmData == null || Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                final List<float[]> spectrumFrames = new ArrayList<>();
+                pitchAnalyzer.analyzePcm(
+                        pcmData.samples,
+                        pcmData.sampleRate,
+                        null,
+                        new PitchAnalyzer.SpectrumListener() {
+                            @Override
+                            public void onSpectrum(float[] magnitudes, int sampleRate) {
+                                spectrumFrames.add(magnitudes);
+                            }
+                        }
+                );
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (spectrogramView == null) {
+                            return;
+                        }
+                        spectrogramView.clear();
+                        for (float[] frame : spectrumFrames) {
+                            spectrogramView.addSpectrumFrame(frame, pcmData.sampleRate, frame.length * 2);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     private PcmData decodeAudioResource(int resId) {
@@ -451,6 +565,125 @@ public class SyllableDiscriminationActivity extends AppCompatActivity {
             pcmSamples[i] = samples.get(i);
         }
         return new PcmData(pcmSamples, sampleRate);
+    }
+
+    private PcmData decodeAudioFile(File file) {
+        MediaExtractor extractor = new MediaExtractor();
+        MediaCodec codec = null;
+        int sampleRate = 22050;
+        int channels = 1;
+        List<Short> samples = new ArrayList<>();
+        try {
+            extractor.setDataSource(file.getAbsolutePath());
+
+            int trackIndex = selectAudioTrack(extractor);
+            if (trackIndex < 0) {
+                return null;
+            }
+            extractor.selectTrack(trackIndex);
+            MediaFormat format = extractor.getTrackFormat(trackIndex);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+            }
+            if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+            }
+            if (mime == null) {
+                return null;
+            }
+            codec = MediaCodec.createDecoderByType(mime);
+            codec.configure(format, null, null, 0);
+            codec.start();
+
+            boolean inputDone = false;
+            boolean outputDone = false;
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            while (!outputDone && !Thread.currentThread().isInterrupted()) {
+                if (!inputDone) {
+                    int inputIndex = codec.dequeueInputBuffer(10000);
+                    if (inputIndex >= 0) {
+                        ByteBuffer inputBuffer = codec.getInputBuffer(inputIndex);
+                        int sampleSize = extractor.readSampleData(inputBuffer, 0);
+                        if (sampleSize < 0) {
+                            codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            inputDone = true;
+                        } else {
+                            long presentationTimeUs = extractor.getSampleTime();
+                            codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0);
+                            extractor.advance();
+                        }
+                    }
+                }
+
+                int outputIndex = codec.dequeueOutputBuffer(bufferInfo, 10000);
+                if (outputIndex >= 0) {
+                    if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        outputDone = true;
+                    }
+                    if (bufferInfo.size > 0) {
+                        ByteBuffer outputBuffer = codec.getOutputBuffer(outputIndex);
+                        if (outputBuffer != null) {
+                            outputBuffer.position(bufferInfo.offset);
+                            outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
+                            outputBuffer.order(ByteOrder.LITTLE_ENDIAN);
+                            ByteBuffer slice = outputBuffer.slice();
+                            slice.order(ByteOrder.LITTLE_ENDIAN);
+                            ShortBuffer shortBuffer = slice.asShortBuffer();
+                            short[] temp = new short[bufferInfo.size / 2];
+                            shortBuffer.get(temp);
+                            if (channels > 1) {
+                                for (int i = 0; i < temp.length; i += channels) {
+                                    samples.add(temp[i]);
+                                }
+                            } else {
+                                for (short value : temp) {
+                                    samples.add(value);
+                                }
+                            }
+                        }
+                    }
+                    codec.releaseOutputBuffer(outputIndex, false);
+                } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    MediaFormat outputFormat = codec.getOutputFormat();
+                    if (outputFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                        sampleRate = outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                    }
+                    if (outputFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                        channels = outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            return null;
+        } finally {
+            extractor.release();
+            if (codec != null) {
+                try {
+                    codec.stop();
+                } catch (Exception ignored) {
+                }
+                codec.release();
+            }
+        }
+
+        if (samples.isEmpty()) {
+            return null;
+        }
+        short[] pcmSamples = new short[samples.size()];
+        for (int i = 0; i < samples.size(); i++) {
+            pcmSamples[i] = samples.get(i);
+        }
+        return new PcmData(pcmSamples, sampleRate);
+    }
+
+    private void deleteTempFile(File file) {
+        if (file == null) {
+            return;
+        }
+        if (!file.delete()) {
+            file.deleteOnExit();
+        }
     }
 
     private int selectAudioTrack(MediaExtractor extractor) {
