@@ -15,7 +15,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.fluitebox.app.R;
+import tatar.eljah.fluitblox.R;
 
 public class CaptureSheetActivity extends AppCompatActivity {
     private static final int REQ_CAMERA = 410;
