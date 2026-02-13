@@ -1,14 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="tatar.eljah"
-    android:versionCode="4"
-    android:versionName="2.2">
+    package="com.recordercoach.app"
+    android:versionCode="1"
+    android:versionName="1.0.0">
 
     <uses-sdk
         android:minSdkVersion="21"
         android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:allowBackup="true"
@@ -17,21 +17,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity
-            android:name=".practice.TonePracticeActivity"
-            android:exported="false" />
-        <activity
-            android:name=".demo.ToneDemoActivity"
-            android:exported="false" />
-        <activity
-            android:name=".practice.SyllableDiscriminationActivity"
-            android:exported="false" />
-        <activity
-            android:name=".settings.VoiceSettingsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name="tatar.eljah.recorder.FingeringHintActivity" android:exported="false" />
+        <activity android:name="tatar.eljah.recorder.ScorePlayActivity" android:exported="false" />
+        <activity android:name="tatar.eljah.recorder.LibraryActivity" android:exported="false" />
+        <activity android:name="tatar.eljah.recorder.CaptureSheetActivity" android:exported="false" />
+        <activity android:name="tatar.eljah.MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

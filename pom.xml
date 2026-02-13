@@ -3,9 +3,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>tatar.eljah</groupId>
-    <artifactId>vietnamese-tone-trainer</artifactId>
-    <version>2.2</version>
+    <groupId>com.recordercoach</groupId>
+    <artifactId>recorder-coach</artifactId>
+    <version>1.0.0</version>
     <packaging>apk</packaging>
 
     <properties>
