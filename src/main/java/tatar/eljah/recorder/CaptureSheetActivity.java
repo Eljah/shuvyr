@@ -120,7 +120,7 @@ public class CaptureSheetActivity extends AppCompatActivity {
                         latestResult.perpendicularScore,
                         latestResult.staffRows,
                         latestResult.barlines,
-                        latestResult.piece.notes.size()) + "\n" + getString(R.string.capture_debug_colors));
+                        latestResult.piece.notes.size()) + "\n" + getString(R.string.capture_debug_colors) + "\n" + getString(R.string.capture_expected_notes));
             }
         }
     }
