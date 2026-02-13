@@ -21,6 +21,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private final PitchAnalyzer pitchAnalyzer = new PitchAnalyzer();
     private final RecorderNoteMapper mapper = new RecorderNoteMapper();
+    private final Object focusLock = new Object();
 
     private ScorePiece piece;
     private int pointer = 0;
@@ -31,9 +32,14 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private volatile boolean midiPlaybackRequested;
     private Thread midiThread;
+    private int midiFocusToken;
 
     private volatile boolean tablaturePlaybackRequested;
     private Thread tablatureThread;
+    private int tablatureFocusToken;
+
+    private int focusCounter;
+    private int activeFocusToken;
 
     private volatile float currentInputIntensity;
     private float intensityThreshold;
@@ -172,10 +178,12 @@ public class ScorePlayActivity extends AppCompatActivity {
     }
 
     private void startMidiPlayback() {
-        if (!requestMusicFocus()) {
+        int focusToken = requestMusicFocus();
+        if (focusToken == 0) {
             status.setText(R.string.play_midi_failed);
             return;
         }
+        midiFocusToken = focusToken;
         midiPlaybackRequested = true;
         pointer = 0;
         overlayView.setPointer(pointer);
@@ -184,10 +192,11 @@ public class ScorePlayActivity extends AppCompatActivity {
             return;
         }
 
+        final int threadFocusToken = focusToken;
         midiThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                playNotesWithSynth(true);
+                playNotesWithSynth(true, threadFocusToken);
             }
         }, "midi-playback");
         midiThread.start();
@@ -195,27 +204,36 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private void stopMidiPlayback() {
         midiPlaybackRequested = false;
-        if (midiThread != null) {
-            midiThread.interrupt();
+        Thread thread = midiThread;
+        if (thread != null) {
+            thread.interrupt();
+            joinThreadQuietly(thread);
             midiThread = null;
         }
-        abandonMusicFocus();
+        abandonMusicFocusIfOwned(midiFocusToken);
+        midiFocusToken = 0;
     }
 
     private void startTablaturePlayback() {
-        if (!requestMusicFocus()) {
+        int focusToken = requestMusicFocus();
+        if (focusToken == 0) {
             status.setText(R.string.play_midi_failed);
             return;
         }
+        tablatureFocusToken = focusToken;
         tablaturePlaybackRequested = true;
+        pointer = 0;
+        overlayView.setPointer(pointer);
         if (tablatureThread != null && tablatureThread.isAlive()) {
             return;
         }
         status.setText(R.string.play_tablature_started);
+
+        final int threadFocusToken = focusToken;
         tablatureThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                playNotesWithSynth(false);
+                playNotesWithSynth(false, threadFocusToken);
             }
         }, "tablature-playback");
         tablatureThread.start();
@@ -223,14 +241,25 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private void stopTablaturePlayback() {
         tablaturePlaybackRequested = false;
-        if (tablatureThread != null) {
-            tablatureThread.interrupt();
+        Thread thread = tablatureThread;
+        if (thread != null) {
+            thread.interrupt();
+            joinThreadQuietly(thread);
             tablatureThread = null;
         }
-        abandonMusicFocus();
+        abandonMusicFocusIfOwned(tablatureFocusToken);
+        tablatureFocusToken = 0;
     }
 
-    private void playNotesWithSynth(boolean midiMode) {
+    private void joinThreadQuietly(Thread thread) {
+        try {
+            thread.join(250);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void playNotesWithSynth(final boolean midiMode, final int focusToken) {
         if (piece == null || piece.notes.isEmpty()) {
             return;
         }
@@ -239,6 +268,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                 AudioFormat.ENCODING_PCM_16BIT);
         if (minBuffer <= 0) {
             postPlaybackError();
+            setPlaybackRequested(midiMode, false);
             return;
         }
 
@@ -252,6 +282,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                     AudioTrack.MODE_STREAM);
             if (track.getState() != AudioTrack.STATE_INITIALIZED) {
                 postPlaybackError();
+                setPlaybackRequested(midiMode, false);
                 return;
             }
             track.play();
@@ -309,8 +340,10 @@ public class ScorePlayActivity extends AppCompatActivity {
             }
             if (midiMode) {
                 midiThread = null;
+                midiFocusToken = 0;
             } else {
                 tablatureThread = null;
+                tablatureFocusToken = 0;
             }
             if (playbackRequested(midiMode)) {
                 runOnUiThread(new Runnable() {
@@ -320,7 +353,8 @@ public class ScorePlayActivity extends AppCompatActivity {
                     }
                 });
             }
-            abandonMusicFocus();
+            setPlaybackRequested(midiMode, false);
+            abandonMusicFocusIfOwned(focusToken);
         }
     }
 
@@ -345,18 +379,36 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
     }
 
-    private boolean requestMusicFocus() {
+    private int requestMusicFocus() {
         if (audioManager == null) {
-            return true;
+            synchronized (focusLock) {
+                activeFocusToken = ++focusCounter;
+                return activeFocusToken;
+            }
         }
         int result = audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            return 0;
+        }
+        synchronized (focusLock) {
+            activeFocusToken = ++focusCounter;
+            return activeFocusToken;
+        }
     }
 
-    private void abandonMusicFocus() {
-        if (audioManager != null) {
-            audioManager.abandonAudioFocus(null);
+    private void abandonMusicFocusIfOwned(int focusToken) {
+        if (focusToken == 0) {
+            return;
+        }
+        synchronized (focusLock) {
+            if (activeFocusToken != focusToken) {
+                return;
+            }
+            activeFocusToken = 0;
+            if (audioManager != null) {
+                audioManager.abandonAudioFocus(null);
+            }
         }
     }
 
@@ -402,6 +454,5 @@ public class ScorePlayActivity extends AppCompatActivity {
         pitchAnalyzer.stop();
         stopMidiPlayback();
         stopTablaturePlayback();
-        abandonMusicFocus();
     }
 }
