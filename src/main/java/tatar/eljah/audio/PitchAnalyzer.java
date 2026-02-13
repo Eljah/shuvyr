@@ -143,7 +143,7 @@ public class PitchAnalyzer {
             return 0f;
         }
         float frequency = (sampleRate * crossings) / (2f * length);
-        if (frequency < 50f || frequency > 400f) {
+        if (frequency < 120f || frequency > 1200f) {
             return 0f;
         }
         return frequency;
