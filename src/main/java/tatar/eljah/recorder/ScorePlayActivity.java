@@ -28,6 +28,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private volatile boolean midiPlaybackRequested;
     private Thread midiThread;
+    private static final int SYNTH_SAMPLE_RATE = 22050;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,6 +120,8 @@ public class ScorePlayActivity extends AppCompatActivity {
     private void startMidiPlayback() {
         pitchAnalyzer.stop();
         midiPlaybackRequested = true;
+        pointer = 0;
+        overlayView.setPointer(pointer);
         status.setText(R.string.play_midi_started);
         if (midiThread != null && midiThread.isAlive()) {
             return;
@@ -135,27 +138,47 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private void stopMidiPlayback() {
         midiPlaybackRequested = false;
+        if (midiThread != null) {
+            midiThread.interrupt();
+            midiThread = null;
+        }
     }
 
     private void playNotesWithSynth() {
         if (piece == null || piece.notes.isEmpty()) {
             return;
         }
-        int sampleRate = 22050;
-        int minBuffer = AudioTrack.getMinBufferSize(sampleRate,
+        int minBuffer = AudioTrack.getMinBufferSize(SYNTH_SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
-        AudioTrack track = new AudioTrack(AudioManager.STREAM_MUSIC,
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                Math.max(minBuffer, sampleRate / 2),
-                AudioTrack.MODE_STREAM);
-        track.play();
+        if (minBuffer <= 0) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    status.setText(R.string.play_midi_finished);
+                }
+            });
+            return;
+        }
 
-        short[] buffer = new short[sampleRate / 8];
+        AudioTrack track = null;
         try {
+            track = new AudioTrack(AudioManager.STREAM_MUSIC,
+                    SYNTH_SAMPLE_RATE,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    Math.max(minBuffer, SYNTH_SAMPLE_RATE / 2),
+                    AudioTrack.MODE_STREAM);
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                return;
+            }
+
+            track.play();
+            short[] buffer = new short[SYNTH_SAMPLE_RATE / 8];
             for (int i = 0; i < piece.notes.size() && midiPlaybackRequested; i++) {
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
                 final int idx = i;
                 final NoteEvent note = piece.notes.get(i);
                 runOnUiThread(new Runnable() {
@@ -169,21 +192,36 @@ public class ScorePlayActivity extends AppCompatActivity {
 
                 double freq = midiToFrequency(MusicNotation.midiFor(note.noteName, note.octave));
                 int ms = durationMs(note.duration);
-                int totalSamples = sampleRate * ms / 1000;
+                int totalSamples = SYNTH_SAMPLE_RATE * ms / 1000;
                 int written = 0;
                 while (written < totalSamples && midiPlaybackRequested) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
                     int chunk = Math.min(buffer.length, totalSamples - written);
                     for (int s = 0; s < chunk; s++) {
-                        double t = (written + s) / (double) sampleRate;
+                        double t = (written + s) / (double) SYNTH_SAMPLE_RATE;
                         buffer[s] = (short) (Math.sin(2d * Math.PI * freq * t) * 12000);
                     }
-                    track.write(buffer, 0, chunk);
-                    written += chunk;
+                    int result = track.write(buffer, 0, chunk);
+                    if (result <= 0) {
+                        break;
+                    }
+                    written += result;
                 }
             }
+        } catch (IllegalStateException ignored) {
         } finally {
-            track.stop();
-            track.release();
+            if (track != null) {
+                try {
+                    if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
+                        track.stop();
+                    }
+                } catch (IllegalStateException ignored) {
+                }
+                track.release();
+            }
+            midiThread = null;
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
