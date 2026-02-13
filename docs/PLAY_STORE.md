@@ -36,7 +36,7 @@ Play enforces minimum **targetSdkVersion** levels (updated yearly). The manifest
 `com.example.*` is a placeholder package. Play requires a unique application ID.
 
 **What to change**
-- Replace `com.example.tonetrainer` with your own unique package name (for example, `tatar.eljah`).
+- Replace `com.example.tonetrainer` with your own unique package name (for example, `tatar.eljah.fluitblox`).
 
 ## 6) Store listing / policy requirements (required)
 These are outside the build system but required to publish:
