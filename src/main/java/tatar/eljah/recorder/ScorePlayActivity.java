@@ -8,6 +8,7 @@ import android.media.AudioTrack;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
@@ -17,7 +18,9 @@ import tatar.eljah.fluitblox.R;
 
 public class ScorePlayActivity extends AppCompatActivity {
     public static final String EXTRA_PIECE_ID = "piece_id";
+    private static final String TAG = "ScorePlayActivity";
     private static final int SYNTH_SAMPLE_RATE = 22050;
+    private static final int SAFE_SAMPLE_RATE = 44100;
 
     private final PitchAnalyzer pitchAnalyzer = new PitchAnalyzer();
     private final RecorderNoteMapper mapper = new RecorderNoteMapper();
@@ -267,10 +270,38 @@ public class ScorePlayActivity extends AppCompatActivity {
         if (piece == null || piece.notes.isEmpty()) {
             return;
         }
-        int minBuffer = AudioTrack.getMinBufferSize(SYNTH_SAMPLE_RATE,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT);
-        if (minBuffer <= 0) {
+
+        final int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
+        final int encoding = AudioFormat.ENCODING_PCM_16BIT;
+        int sampleRate = SYNTH_SAMPLE_RATE;
+        int channelCount = 1;
+        int bytesPerSample = 2;
+        int frameSize = channelCount * bytesPerSample;
+
+        int minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding);
+        int targetFrames = Math.max(sampleRate / 4, 1024);
+        int requestedBuffer = targetFrames * frameSize;
+
+        if (minBuffer <= 0 || sampleRate <= 0) {
+            sampleRate = SAFE_SAMPLE_RATE;
+            minBuffer = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding);
+            targetFrames = Math.max(sampleRate / 4, 1024);
+            requestedBuffer = targetFrames * frameSize;
+        }
+
+        int bufferSize = Math.max(minBuffer, requestedBuffer);
+        if (bufferSize % frameSize != 0) {
+            bufferSize += frameSize - (bufferSize % frameSize);
+        }
+
+        Log.i(TAG, "AudioTrack config: sampleRate=" + sampleRate
+                + ", channelConfig=" + channelConfig
+                + ", encoding=" + encoding
+                + ", minBuf=" + minBuffer
+                + ", requestedBuf=" + requestedBuffer
+                + ", bufferSize=" + bufferSize);
+
+        if (minBuffer <= 0 || bufferSize <= 0) {
             postPlaybackError();
             setPlaybackRequested(midiMode, false);
             return;
@@ -279,10 +310,10 @@ public class ScorePlayActivity extends AppCompatActivity {
         AudioTrack track = null;
         try {
             track = new AudioTrack(AudioManager.STREAM_MUSIC,
-                    SYNTH_SAMPLE_RATE,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    Math.max(minBuffer, SYNTH_SAMPLE_RATE / 2),
+                    sampleRate,
+                    channelConfig,
+                    encoding,
+                    bufferSize,
                     AudioTrack.MODE_STREAM);
             if (track.getState() != AudioTrack.STATE_INITIALIZED) {
                 postPlaybackError();
@@ -291,7 +322,7 @@ public class ScorePlayActivity extends AppCompatActivity {
             }
             track.play();
 
-            short[] buffer = new short[SYNTH_SAMPLE_RATE / 8];
+            short[] buffer = new short[Math.max(sampleRate / 8, 512)];
             for (int i = 0; i < piece.notes.size() && playbackRequested(midiMode); i++) {
                 if (Thread.currentThread().isInterrupted()) {
                     break;
@@ -309,7 +340,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
                 double freq = midiToFrequency(MusicNotation.midiFor(note.noteName, note.octave));
                 int ms = durationMs(note.duration);
-                int totalSamples = SYNTH_SAMPLE_RATE * ms / 1000;
+                int totalSamples = sampleRate * ms / 1000;
                 int written = 0;
                 while (written < totalSamples && playbackRequested(midiMode)) {
                     if (Thread.currentThread().isInterrupted()) {
@@ -317,7 +348,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                     }
                     int chunk = Math.min(buffer.length, totalSamples - written);
                     for (int s = 0; s < chunk; s++) {
-                        double t = (written + s) / (double) SYNTH_SAMPLE_RATE;
+                        double t = (written + s) / (double) sampleRate;
                         buffer[s] = (short) (Math.sin(2d * Math.PI * freq * t) * 12000);
                     }
                     int result = track.write(buffer, 0, chunk);
