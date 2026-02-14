@@ -10,13 +10,22 @@ public class RecorderNoteMapper {
 
     static {
         Map<String, Float> frequencies = new LinkedHashMap<String, Float>();
-        // Yamaha YRS-20S3 (soprano C), equal temperament A4 = 440Hz.
+        // Equal temperament A4 = 440Hz. Includes recorder-centered range plus
+        // octave-4/Bb notes used by reference score and OCR fallback pieces.
+        frequencies.put("D4", 293.66f);
+        frequencies.put("E4", 329.63f);
+        frequencies.put("F4", 349.23f);
+        frequencies.put("G4", 392.00f);
+        frequencies.put("A4", 440.00f);
+        frequencies.put("Bb4", 466.16f);
+        frequencies.put("B4", 493.88f);
         frequencies.put("C5", 523.25f);
         frequencies.put("D5", 587.33f);
         frequencies.put("E5", 659.25f);
         frequencies.put("F5", 698.46f);
         frequencies.put("G5", 783.99f);
         frequencies.put("A5", 880.00f);
+        frequencies.put("Bb5", 932.33f);
         frequencies.put("B5", 987.77f);
         frequencies.put("C6", 1046.50f);
         frequencies.put("D6", 1174.66f);
@@ -24,6 +33,7 @@ public class RecorderNoteMapper {
         frequencies.put("F6", 1396.91f);
         frequencies.put("G6", 1567.98f);
         frequencies.put("A6", 1760.00f);
+        frequencies.put("Bb6", 1864.66f);
         frequencies.put("B6", 1975.53f);
         frequencies.put("C7", 2093.00f);
         frequencies.put("D7", 2349.32f);
