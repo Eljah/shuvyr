@@ -338,7 +338,9 @@ public class ScorePlayActivity extends AppCompatActivity {
                     }
                 });
 
-                double freq = midiToFrequency(MusicNotation.midiFor(note.noteName, note.octave));
+                double freq = midiMode
+                        ? midiToFrequency(MusicNotation.midiFor(note.noteName, note.octave))
+                        : resolveTablatureFrequency(note);
                 int ms = durationMs(note.duration);
                 int totalSamples = sampleRate * ms / 1000;
                 int written = 0;
@@ -451,6 +453,15 @@ public class ScorePlayActivity extends AppCompatActivity {
         if ("eighth".equals(duration)) return 240;
         if ("half".equals(duration)) return 900;
         return 450;
+    }
+
+    private double resolveTablatureFrequency(NoteEvent note) {
+        String noteName = note.fullName();
+        float mappedFrequency = mapper.frequencyFor(noteName);
+        if (mappedFrequency > 0f) {
+            return mappedFrequency;
+        }
+        return midiToFrequency(MusicNotation.midiFor(note.noteName, note.octave));
     }
 
     private double midiToFrequency(int midi) {
