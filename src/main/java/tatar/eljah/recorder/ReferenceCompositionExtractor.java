@@ -123,18 +123,20 @@ public final class ReferenceCompositionExtractor {
                     int status;
                     if ((statusOrData & 0x80) != 0) {
                         status = statusOrData;
-                        runningStatus = status;
                         if (status == 0xFF) {
+                            runningStatus = 0;
                             r.readUnsignedByte();
                             int metaLen = r.readVarLen();
                             r.skip(metaLen);
                             continue;
                         }
                         if (status == 0xF0 || status == 0xF7) {
+                            runningStatus = 0;
                             int syxLen = r.readVarLen();
                             r.skip(syxLen);
                             continue;
                         }
+                        runningStatus = status;
                         int data1 = r.readUnsignedByte();
                         int type = status & 0xF0;
                         if (type == 0x80 || type == 0x90 || type == 0xA0 || type == 0xB0 || type == 0xE0) {
@@ -152,9 +154,13 @@ public final class ReferenceCompositionExtractor {
                         status = runningStatus;
                         int data1 = statusOrData;
                         int type = status & 0xF0;
-                        int data2 = r.readUnsignedByte();
-                        if (type == 0x90 && data2 > 0) {
-                            out.add(data1);
+                        if (type == 0x80 || type == 0x90 || type == 0xA0 || type == 0xB0 || type == 0xE0) {
+                            int data2 = r.readUnsignedByte();
+                            if (type == 0x90 && data2 > 0) {
+                                out.add(data1);
+                            }
+                        } else if (type != 0xC0 && type != 0xD0) {
+                            throw new IOException("Unsupported MIDI status: " + status);
                         }
                     }
                 }
