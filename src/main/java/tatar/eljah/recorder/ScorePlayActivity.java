@@ -68,20 +68,27 @@ public class ScorePlayActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.text_piece_title)).setText(piece.title);
         overlayView.setNotes(piece.notes);
         overlayView.setPointer(pointer);
+        if (!piece.notes.isEmpty()) {
+            NoteEvent firstExpected = piece.notes.get(pointer);
+            overlayView.setFrequencies(expectedFrequencyFor(firstExpected), 0f);
+        }
 
         RadioGroup modeGroup = findViewById(R.id.group_play_mode);
         modeGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 if (checkedId == R.id.radio_mode_midi) {
+                    overlayView.setMicMode(false);
                     stopTablaturePlayback();
                     pitchAnalyzer.stop();
                     startMidiPlayback();
                 } else if (checkedId == R.id.radio_mode_tablature) {
+                    overlayView.setMicMode(false);
                     stopMidiPlayback();
                     ensureMicListening();
                     startTablaturePlayback();
                 } else {
+                    overlayView.setMicMode(true);
                     stopMidiPlayback();
                     stopTablaturePlayback();
                     ensureMicListening();
@@ -89,6 +96,7 @@ public class ScorePlayActivity extends AppCompatActivity {
             }
         });
 
+        overlayView.setMicMode(true);
         ensureMicListening();
     }
 
@@ -156,14 +164,17 @@ public class ScorePlayActivity extends AppCompatActivity {
         if (piece == null || pointer >= piece.notes.size()) {
             return;
         }
-        if (currentInputIntensity < intensityThreshold) {
-            status.setText(getString(R.string.play_waiting_intensity, intensityThreshold));
-            return;
-        }
 
         NoteEvent expected = piece.notes.get(pointer);
         String expectedName = expected.fullName();
-        float expectedFrequency = mapper.frequencyFor(expectedName);
+        float expectedFrequency = expectedFrequencyFor(expected);
+
+        if (currentInputIntensity < intensityThreshold) {
+            overlayView.setFrequencies(expectedFrequency, 0f);
+            overlayView.setPointer(pointer);
+            status.setText(getString(R.string.play_waiting_intensity, intensityThreshold));
+            return;
+        }
 
         float normalizedHz = normalizeDetectedPitch(hz, expectedFrequency);
         String detected = mapper.fromFrequency(normalizedHz);
@@ -182,10 +193,25 @@ public class ScorePlayActivity extends AppCompatActivity {
         pointer++;
         if (pointer < piece.notes.size()) {
             overlayView.setPointer(pointer);
+            NoteEvent nextExpected = piece.notes.get(pointer);
+            overlayView.setFrequencies(expectedFrequencyFor(nextExpected), 0f);
         } else {
             status.setText(R.string.play_done);
             stopTablaturePlayback();
         }
+    }
+
+
+    private float expectedFrequencyFor(NoteEvent note) {
+        if (note == null) {
+            return 0f;
+        }
+        float mapped = mapper.frequencyFor(note.fullName());
+        if (mapped > 0f) {
+            return mapped;
+        }
+        int midi = MusicNotation.midiFor(note.noteName, note.octave);
+        return (float) (440.0 * Math.pow(2.0, (midi - 69) / 12.0));
     }
 
     private float normalizeDetectedPitch(float detectedHz, float expectedFrequency) {
@@ -194,7 +220,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
 
         float halvedHz = detectedHz / 2f;
-        float minMappedHz = mapper.frequencyFor("G4");
+        float minMappedHz = mapper.frequencyFor("D4");
         float maxMappedHz = mapper.frequencyFor("A6");
 
         boolean directInRange = detectedHz >= minMappedHz && detectedHz <= maxMappedHz;
