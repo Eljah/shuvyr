@@ -160,14 +160,17 @@ public class ScorePlayActivity extends AppCompatActivity {
         if (piece == null || pointer >= piece.notes.size()) {
             return;
         }
-        if (currentInputIntensity < intensityThreshold) {
-            status.setText(getString(R.string.play_waiting_intensity, intensityThreshold));
-            return;
-        }
 
         NoteEvent expected = piece.notes.get(pointer);
         String expectedName = expected.fullName();
         float expectedFrequency = mapper.frequencyFor(expectedName);
+
+        if (currentInputIntensity < intensityThreshold) {
+            overlayView.setFrequencies(expectedFrequency, 0f);
+            overlayView.setPointer(pointer);
+            status.setText(getString(R.string.play_waiting_intensity, intensityThreshold));
+            return;
+        }
 
         float normalizedHz = normalizeDetectedPitch(hz, expectedFrequency);
         String detected = mapper.fromFrequency(normalizedHz);

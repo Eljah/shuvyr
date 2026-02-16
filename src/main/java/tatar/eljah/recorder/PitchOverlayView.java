@@ -13,6 +13,7 @@ import java.util.List;
 
 public class PitchOverlayView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 3000f;
+    private static final float NOTE_LABEL_MIN_GAP_PX = 2f;
 
     private final Paint staffPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -128,7 +129,13 @@ public class PitchOverlayView extends View {
         float noteRadius = Math.max(2.5f, Math.min(lineGap * 0.35f, noteStep * 0.42f));
 
         List<LabelLayout> labelsToDraw = new ArrayList<LabelLayout>();
-        float[] labelRows = new float[]{firstLineY + lineGap * 5.7f};
+        float[] labelRows = new float[]{
+                firstLineY + lineGap * 5.35f,
+                firstLineY + lineGap * 5.85f,
+                firstLineY + lineGap * 6.35f,
+                firstLineY + lineGap * 6.85f
+        };
+        float[] lastLabelRight = new float[]{Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
 
         for (int i = 0; i < notes.size(); i++) {
             NoteEvent note = notes.get(i);
@@ -140,9 +147,35 @@ public class PitchOverlayView extends View {
             String label = MusicNotation.toEuropeanLabel(note.noteName, note.octave);
             float textWidth = labelPaint.measureText(label);
             float textLeft = x - textWidth / 2f;
+            float minLeft = 0f;
+            float maxLeft = Math.max(minLeft, w - textWidth);
 
-            int row = i % labelRows.length;
-            labelsToDraw.add(new LabelLayout(label, textLeft, labelRows[row], i == pointer));
+            int preferredRow = i % labelRows.length;
+            int selectedRow = preferredRow;
+            boolean foundWithoutOverlap = false;
+            for (int attempt = 0; attempt < labelRows.length; attempt++) {
+                int rowCandidate = (preferredRow + attempt) % labelRows.length;
+                if (textLeft >= lastLabelRight[rowCandidate] + NOTE_LABEL_MIN_GAP_PX) {
+                    selectedRow = rowCandidate;
+                    foundWithoutOverlap = true;
+                    break;
+                }
+            }
+
+            if (!foundWithoutOverlap) {
+                float bestRight = Float.MAX_VALUE;
+                for (int row = 0; row < labelRows.length; row++) {
+                    if (lastLabelRight[row] < bestRight) {
+                        bestRight = lastLabelRight[row];
+                        selectedRow = row;
+                    }
+                }
+                textLeft = Math.max(textLeft, lastLabelRight[selectedRow] + NOTE_LABEL_MIN_GAP_PX);
+            }
+
+            textLeft = Math.max(minLeft, Math.min(maxLeft, textLeft));
+            labelsToDraw.add(new LabelLayout(label, textLeft, labelRows[selectedRow], i == pointer));
+            lastLabelRight[selectedRow] = textLeft + textWidth;
         }
 
         for (LabelLayout labelLayout : labelsToDraw) {
@@ -177,10 +210,9 @@ public class PitchOverlayView extends View {
 
         if (micMode && expectedHz > 0f) {
             float secondHarmonicHz = expectedHz * 2f;
-            if (secondHarmonicHz <= MAX_SPECTROGRAM_HZ) {
-                float expectedY = yForFrequency(secondHarmonicHz, startY, bottom);
-                canvas.drawLine(0, expectedY, w, expectedY, expectedPaint);
-            }
+            float guideHz = Math.min(secondHarmonicHz, MAX_SPECTROGRAM_HZ);
+            float expectedY = yForFrequency(guideHz, startY, bottom);
+            canvas.drawLine(0, expectedY, w, expectedY, expectedPaint);
         }
     }
 
