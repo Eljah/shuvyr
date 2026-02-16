@@ -161,16 +161,19 @@ public class ScorePlayActivity extends AppCompatActivity {
             return;
         }
 
-        String detected = mapper.fromFrequency(hz);
-
         NoteEvent expected = piece.notes.get(pointer);
         String expectedName = expected.fullName();
-        overlayView.setFrequencies(mapper.frequencyFor(expectedName), hz);
+        float expectedFrequency = mapper.frequencyFor(expectedName);
+
+        float normalizedHz = normalizeDetectedPitch(hz, expectedFrequency);
+        String detected = mapper.fromFrequency(normalizedHz);
+
+        overlayView.setFrequencies(expectedFrequency, normalizedHz);
         overlayView.setPointer(pointer);
         status.setText(getString(R.string.play_status_template,
                 MusicNotation.toEuropeanLabel(expected.noteName, expected.octave),
                 toEuropeanLabelFromFull(detected),
-                (int) hz));
+                (int) normalizedHz));
 
         if (!detected.equals(expectedName)) {
             return;
@@ -183,6 +186,36 @@ public class ScorePlayActivity extends AppCompatActivity {
             status.setText(R.string.play_done);
             stopTablaturePlayback();
         }
+    }
+
+    private float normalizeDetectedPitch(float detectedHz, float expectedFrequency) {
+        if (detectedHz <= 0f) {
+            return detectedHz;
+        }
+
+        float halvedHz = detectedHz / 2f;
+        float minMappedHz = mapper.frequencyFor("G4");
+        float maxMappedHz = mapper.frequencyFor("A6");
+
+        boolean directInRange = detectedHz >= minMappedHz && detectedHz <= maxMappedHz;
+        boolean halvedInRange = halvedHz >= minMappedHz && halvedHz <= maxMappedHz;
+
+        if (!directInRange && halvedInRange) {
+            return halvedHz;
+        }
+
+        if (expectedFrequency <= 0f) {
+            return detectedHz;
+        }
+
+        float directDiff = Math.abs(detectedHz - expectedFrequency);
+        float halvedDiff = Math.abs(halvedHz - expectedFrequency);
+
+        if (halvedInRange && halvedDiff < directDiff) {
+            return halvedHz;
+        }
+
+        return detectedHz;
     }
 
     private void startMidiPlayback() {
