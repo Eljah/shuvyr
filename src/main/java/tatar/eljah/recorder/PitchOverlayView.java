@@ -177,8 +177,10 @@ public class PitchOverlayView extends View {
 
         if (micMode && expectedHz > 0f) {
             float secondHarmonicHz = expectedHz * 2f;
-            float expectedY = yForFrequency(secondHarmonicHz, startY, bottom);
-            canvas.drawLine(0, expectedY, w, expectedY, expectedPaint);
+            if (secondHarmonicHz <= MAX_SPECTROGRAM_HZ) {
+                float expectedY = yForFrequency(secondHarmonicHz, startY, bottom);
+                canvas.drawLine(0, expectedY, w, expectedY, expectedPaint);
+            }
         }
     }
 
