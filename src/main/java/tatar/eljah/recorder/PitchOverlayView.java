@@ -27,6 +27,7 @@ public class PitchOverlayView extends View {
     private static final int REFERENCE_NOTE_COUNT = 56;
     private static final float BASE_LABEL_TEXT_SIZE_PX = 28f;
     private static final float MIN_LABEL_TEXT_SIZE_PX = 14f;
+    private static final float PROGRESS_BOUNDARY_GAP_UNITS = 0.7f;
 
     private final Paint staffPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -234,7 +235,7 @@ public class PitchOverlayView extends View {
         labelHitInfos.clear();
         for (int i = 0; i < notes.size(); i++) {
             NoteEvent note = notes.get(i);
-            float x = leftPad + available * ((float) i / Math.max(1, notes.size() - 1));
+            float x = xForIndex(i, leftPad, available);
             int step = diatonicStepFromBottomLineE4(note.noteName, note.octave);
             float y = yForStaffStep(step, bottomLineY, lineGap);
             drawLedgerLines(canvas, x, step, lineGap, bottomLineY, noteRadius);
@@ -325,6 +326,28 @@ public class PitchOverlayView extends View {
             }
         }
         return lastLabelRight.size();
+    }
+
+    private float xForIndex(int index, float leftPad, float available) {
+        int count = notes.size();
+        if (count <= 1) {
+            return leftPad + available * 0.5f;
+        }
+
+        float extraGap = progressBoundaryGapUnits();
+        float weightedIndex = index;
+        if (extraGap > 0f && index > pointer) {
+            weightedIndex += extraGap;
+        }
+        float denominator = (count - 1) + extraGap;
+        return leftPad + available * (weightedIndex / Math.max(1f, denominator));
+    }
+
+    private float progressBoundaryGapUnits() {
+        if (pointer < 0 || pointer >= notes.size() - 1) {
+            return 0f;
+        }
+        return PROGRESS_BOUNDARY_GAP_UNITS;
     }
 
     private void drawLedgerLines(Canvas canvas, float x, int step, float lineGap, float bottomLineY, float noteRadius) {

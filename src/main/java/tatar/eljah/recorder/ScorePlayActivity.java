@@ -44,6 +44,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private TextView status;
     private PitchOverlayView overlayView;
+    private TextView currentFingeringView;
     private AudioManager audioManager;
 
     private volatile boolean midiPlaybackRequested;
@@ -76,6 +77,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         status = findViewById(R.id.text_status);
         overlayView = findViewById(R.id.pitch_overlay);
+        currentFingeringView = findViewById(R.id.text_current_fingering);
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
 
         if (piece == null || piece.notes.isEmpty()) {
@@ -85,6 +87,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         ((TextView) findViewById(R.id.text_piece_title)).setText(piece.title);
         overlayView.setNotes(piece.notes);
+        updateCurrentFingeringHint();
         actualDurationMsByIndex = new long[piece.notes.size()];
         for (int i = 0; i < actualDurationMsByIndex.length; i++) {
             actualDurationMsByIndex[i] = -1L;
@@ -269,8 +272,29 @@ public class ScorePlayActivity extends AppCompatActivity {
         } else {
             status.setText(R.string.play_done);
             stopTablaturePlayback();
+            updateCurrentFingeringHint();
         }
     }
+
+    private void updateCurrentFingeringHint() {
+        if (piece == null || piece.notes == null || piece.notes.isEmpty() || pointer < 0 || pointer >= piece.notes.size()) {
+            if (currentFingeringView != null) {
+                currentFingeringView.setText(getString(R.string.play_current_fingering_idle));
+            }
+            setTitle(getString(R.string.app_name));
+            return;
+        }
+
+        NoteEvent currentNote = piece.notes.get(pointer);
+        String localizedNote = MusicNotation.toLocalizedLabel(this, currentNote.noteName, currentNote.octave);
+        String fingering = mapper.fingeringFor(currentNote.fullName());
+        String hintText = getString(R.string.play_current_fingering_template, localizedNote, fingering);
+        if (currentFingeringView != null) {
+            currentFingeringView.setText(hintText);
+        }
+        setTitle(getString(R.string.play_header_with_fingering, hintText));
+    }
+
     private void updateDurationMismatchForPrevious(int currentIndex) {
         if (currentIndex <= 0 || piece == null || currentIndex - 1 >= piece.notes.size()) {
             return;
@@ -348,6 +372,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         pointerUpdatedAtMs = SystemClock.elapsedRealtime();
         resetTablatureMismatchTracking();
         overlayView.setPointer(newPointer);
+        updateCurrentFingeringHint();
     }
 
     private void clearAllNoteStates() {
@@ -377,6 +402,7 @@ public class ScorePlayActivity extends AppCompatActivity {
             overlayView.setFrequencies(expectedFrequencyFor(piece.notes.get(0)), 0f);
         }
         status.setText(R.string.play_restarted);
+        updateCurrentFingeringHint();
     }
 
     private float expectedFrequencyFor(NoteEvent note) {
