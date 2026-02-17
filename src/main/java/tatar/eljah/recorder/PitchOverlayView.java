@@ -23,8 +23,7 @@ public class PitchOverlayView extends View {
     private static final float STAFF_LINE_GAP_FOR_12_NOTES_PX = 36f;
     private static final float STAFF_PANEL_MIN_HEIGHT_PX = STAFF_LINE_GAP_FOR_12_NOTES_PX * LEDGER_STAFF_SPAN_IN_GAPS;
     private static final float LABEL_PANEL_MIN_HEIGHT_PX = 42f;
-    private static final float SPECTROGRAM_PANEL_BASE_HEIGHT_PX = 88f;
-    private static final float SPECTROGRAM_FIXED_HEIGHT_PX = SPECTROGRAM_PANEL_BASE_HEIGHT_PX * 2f;
+    private static final float SPECTROGRAM_PANEL_BASE_HEIGHT_PX = 150f;
     private static final int REFERENCE_NOTE_COUNT = 56;
     private static final float BASE_LABEL_TEXT_SIZE_PX = 28f;
     private static final float MIN_LABEL_TEXT_SIZE_PX = 14f;
@@ -129,7 +128,7 @@ public class PitchOverlayView extends View {
                 requiredLabelPanelHeight(estimatedLabelRows, baseTextHeight));
 
         float staffHeight = STAFF_PANEL_MIN_HEIGHT_PX;
-        float spectrogramHeight = SPECTROGRAM_FIXED_HEIGHT_PX;
+        float spectrogramHeight = SPECTROGRAM_PANEL_BASE_HEIGHT_PX;
 
         float requiredHeight = STAFF_TOP_PADDING_PX + staffHeight
                 + NOTE_LABEL_BLOCK_GAP_PX + desiredLabelHeight
