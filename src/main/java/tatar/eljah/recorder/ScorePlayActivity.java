@@ -749,17 +749,12 @@ public class ScorePlayActivity extends AppCompatActivity {
     }
 
     private String toEuropeanLabelFromFull(String fullName) {
-        if (fullName == null || fullName.length() < 2) {
+        String normalized = MusicNotation.normalizeNoteKey(fullName);
+        MusicNotation.ParsedNote parsed = MusicNotation.parseNormalizedNoteKey(normalized);
+        if (parsed == null) {
             return fullName;
         }
-        String note = fullName.substring(0, fullName.length() - 1);
-        int octave;
-        try {
-            octave = Integer.parseInt(fullName.substring(fullName.length() - 1));
-        } catch (NumberFormatException ex) {
-            return fullName;
-        }
-        return MusicNotation.toLocalizedLabel(this, note, octave);
+        return MusicNotation.toLocalizedLabel(this, parsed.noteName, parsed.octave);
     }
 
     @Override
