@@ -13,6 +13,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
@@ -30,6 +31,7 @@ public class ScorePlayActivity extends AppCompatActivity {
     private static final int TABLATURE_MISMATCH_CONFIRMATION_FRAMES = 2;
     private static final int MIN_MATCH_HOLD_MS = 110;
     private static final float MIN_MATCH_HOLD_DURATION_FRACTION = 0.45f;
+    private static final float DURATION_MISMATCH_TOLERANCE_FRACTION = 0.60f;
 
     private final PitchAnalyzer pitchAnalyzer = new PitchAnalyzer();
     private final RecorderNoteMapper mapper = new RecorderNoteMapper();
@@ -59,6 +61,7 @@ public class ScorePlayActivity extends AppCompatActivity {
     private int consecutiveTablatureMismatchFrames;
     private String lastTablatureMismatchPitch;
     private long lastMatchAcceptedAtMs;
+    private boolean simplifiedMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,6 +82,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         ((TextView) findViewById(R.id.text_piece_title)).setText(piece.title);
         overlayView.setNotes(piece.notes);
+        resetMatchCadenceTracking();
         setPointerWithTracking(-1);
         if (!piece.notes.isEmpty()) {
             NoteEvent firstExpected = piece.notes.get(pointer);
@@ -90,6 +94,11 @@ public class ScorePlayActivity extends AppCompatActivity {
                 Intent intent = new Intent(ScorePlayActivity.this, FingeringHintActivity.class);
                 intent.putExtra("expected", expectedFullName);
                 intent.putExtra("actual", actualFullName);
+                intent.putExtra("note_index", index + 1);
+                intent.putExtra("duration_mismatch", overlayView.isDurationMismatch(index));
+                if (piece != null && index >= 0 && index < piece.notes.size()) {
+                    intent.putExtra("expected_duration", piece.notes.get(index).duration);
+                }
                 startActivity(intent);
             }
         });
@@ -101,6 +110,17 @@ public class ScorePlayActivity extends AppCompatActivity {
                 restartProgress();
             }
         });
+
+        final RadioButton simplifiedModeButton = findViewById(R.id.radio_simplified_mode);
+        simplifiedMode = simplifiedModeButton != null && simplifiedModeButton.isChecked();
+        if (simplifiedModeButton != null) {
+            simplifiedModeButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    simplifiedMode = simplifiedModeButton.isChecked();
+                }
+            });
+        }
 
         RadioGroup modeGroup = findViewById(R.id.group_play_mode);
         modeGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
@@ -214,7 +234,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                 toEuropeanLabelFromFull(detected),
                 (int) normalizedHz));
 
-        if (!samePitch(detected, expectedName)) {
+        if (!samePitch(detected, expectedName, simplifiedMode)) {
             if (shouldDeferTablatureMismatch(detected)) {
                 return;
             }
@@ -225,9 +245,12 @@ public class ScorePlayActivity extends AppCompatActivity {
         resetTablatureMismatchTracking();
         overlayView.clearMismatch(pointer);
         overlayView.markMatched(pointer, detected);
+        overlayView.clearDurationMismatch(pointer);
         if (!canAdvanceToNextNote(expected)) {
             return;
         }
+        updateDurationMismatchForPrevious(pointer);
+        lastMatchAcceptedAtMs = SystemClock.elapsedRealtime();
         pointer++;
         if (pointer < piece.notes.size()) {
             setPointerWithTracking(pointer);
@@ -238,23 +261,38 @@ public class ScorePlayActivity extends AppCompatActivity {
             stopTablaturePlayback();
         }
     }
+    private void updateDurationMismatchForPrevious(int currentIndex) {
+        if (currentIndex <= 0 || piece == null || currentIndex - 1 >= piece.notes.size()) {
+            return;
+        }
 
+        long now = SystemClock.elapsedRealtime();
+        if (lastMatchAcceptedAtMs <= 0L) {
+            overlayView.clearDurationMismatch(currentIndex - 1);
+            return;
+        }
+
+        NoteEvent previousNote = piece.notes.get(currentIndex - 1);
+        long actualDurationMs = now - lastMatchAcceptedAtMs;
+        long expectedDurationMs = durationMs(previousNote.duration);
+        long allowedDeviation = (long) (expectedDurationMs * DURATION_MISMATCH_TOLERANCE_FRACTION);
+        long deviation = Math.abs(actualDurationMs - expectedDurationMs);
+        if (deviation > allowedDeviation) {
+            overlayView.markDurationMismatch(currentIndex - 1);
+        } else {
+            overlayView.clearDurationMismatch(currentIndex - 1);
+        }
+    }
 
     private boolean canAdvanceToNextNote(NoteEvent note) {
         long now = SystemClock.elapsedRealtime();
         if (lastMatchAcceptedAtMs <= 0L) {
-            lastMatchAcceptedAtMs = now;
             return true;
         }
 
         long minHoldMs = Math.max(MIN_MATCH_HOLD_MS,
                 (long) (durationMs(note.duration) * MIN_MATCH_HOLD_DURATION_FRACTION));
-        if (now - lastMatchAcceptedAtMs < minHoldMs) {
-            return false;
-        }
-
-        lastMatchAcceptedAtMs = now;
-        return true;
+        return now - lastMatchAcceptedAtMs >= minHoldMs;
     }
 
     private boolean shouldDeferTablatureMismatch(String detectedPitch) {
@@ -296,20 +334,26 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
         pointerUpdatedAtMs = SystemClock.elapsedRealtime();
         resetTablatureMismatchTracking();
-        resetMatchCadenceTracking();
         overlayView.setPointer(newPointer);
+    }
+
+    private void clearAllNoteStates() {
+        if (piece == null) {
+            return;
+        }
+        for (int i = 0; i < piece.notes.size(); i++) {
+            overlayView.clearMismatch(i);
+            overlayView.clearMatched(i);
+            overlayView.clearDurationMismatch(i);
+        }
     }
 
     private void restartProgress() {
         stopMidiPlayback();
         stopTablaturePlayback();
         pointer = 0;
-        if (piece != null) {
-            for (int i = 0; i < piece.notes.size(); i++) {
-                overlayView.clearMismatch(i);
-                overlayView.clearMatched(i);
-            }
-        }
+        clearAllNoteStates();
+        resetMatchCadenceTracking();
         setPointerWithTracking(-1);
         if (piece != null && !piece.notes.isEmpty()) {
             overlayView.setFrequencies(expectedFrequencyFor(piece.notes.get(0)), 0f);
@@ -367,6 +411,8 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
         midiFocusToken = focusToken;
         midiPlaybackRequested = true;
+        clearAllNoteStates();
+        resetMatchCadenceTracking();
         pointer = 0;
         setPointerWithTracking(pointer);
         status.setText(R.string.play_midi_started);
@@ -404,6 +450,8 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
         tablatureFocusToken = focusToken;
         tablaturePlaybackRequested = true;
+        clearAllNoteStates();
+        resetMatchCadenceTracking();
         pointer = 0;
         setPointerWithTracking(pointer);
         analyzeTablatureFrequencies();
@@ -631,8 +679,10 @@ public class ScorePlayActivity extends AppCompatActivity {
     }
 
     private int durationMs(String duration) {
+        if ("16th".equals(duration)) return 120;
         if ("eighth".equals(duration)) return 240;
         if ("half".equals(duration)) return 900;
+        if ("whole".equals(duration)) return 1800;
         return 450;
     }
 
@@ -667,7 +717,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         for (NoteEvent note : piece.notes) {
             String expected = note.fullName();
             String synthesized = mapper.fromFrequency((float) resolveTablatureFrequency(note));
-            if (samePitch(expected, synthesized)) {
+            if (samePitch(expected, synthesized, false)) {
                 exactMatches++;
             } else {
                 Log.w(TAG, "Tablature frequency label mismatch: expected=" + expected + ", synthesized=" + synthesized);
@@ -680,7 +730,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
     }
 
-    private boolean samePitch(String firstFullName, String secondFullName) {
+    private boolean samePitch(String firstFullName, String secondFullName, boolean simplifiedAccidentalsMode) {
         if (firstFullName == null || secondFullName == null) {
             return false;
         }
@@ -695,10 +745,21 @@ public class ScorePlayActivity extends AppCompatActivity {
             int firstOctave = Integer.parseInt(firstFullName.substring(firstFullName.length() - 1));
             String secondNote = secondFullName.substring(0, secondFullName.length() - 1);
             int secondOctave = Integer.parseInt(secondFullName.substring(secondFullName.length() - 1));
+            if (simplifiedAccidentalsMode) {
+                return firstOctave == secondOctave
+                        && baseNoteLetter(firstNote).equals(baseNoteLetter(secondNote));
+            }
             return MusicNotation.midiFor(firstNote, firstOctave) == MusicNotation.midiFor(secondNote, secondOctave);
         } catch (NumberFormatException ex) {
             return false;
         }
+    }
+
+    private String baseNoteLetter(String noteName) {
+        if (noteName == null || noteName.length() == 0) {
+            return "";
+        }
+        return String.valueOf(Character.toUpperCase(noteName.charAt(0)));
     }
 
     private String toEuropeanLabelFromFull(String fullName) {

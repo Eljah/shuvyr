@@ -14,10 +14,24 @@ public class FingeringHintActivity extends AppCompatActivity {
 
         String expectedFullName = sanitizeNoteKey(getIntent().getStringExtra("expected"));
         String actualFullName = sanitizeNoteKey(getIntent().getStringExtra("actual"));
+        int noteIndex = getIntent().getIntExtra("note_index", -1);
+        boolean durationMismatch = getIntent().getBooleanExtra("duration_mismatch", false);
+        String expectedDuration = getIntent().getStringExtra("expected_duration");
         RecorderNoteMapper mapper = new RecorderNoteMapper();
 
         String expectedLabel = toEuropean(expectedFullName);
         String actualLabel = toEuropean(actualFullName);
+
+        if (noteIndex > 0) {
+            ((TextView) findViewById(R.id.text_note_index)).setText(getString(R.string.hint_note_index, noteIndex));
+        }
+
+        TextView durationHintView = findViewById(R.id.text_duration_hint);
+        if (durationMismatch) {
+            durationHintView.setText(getString(R.string.hint_duration_mismatch, durationLabel(expectedDuration)));
+        } else {
+            durationHintView.setText(R.string.hint_duration_ok);
+        }
 
         ((TextView) findViewById(R.id.text_expected_note)).setText(getString(
                 R.string.hint_expected,
@@ -34,6 +48,15 @@ public class FingeringHintActivity extends AppCompatActivity {
             return "";
         }
         return fullName.trim();
+    }
+
+    private String durationLabel(String duration) {
+        if ("whole".equals(duration)) return getString(R.string.hint_duration_whole);
+        if ("half".equals(duration)) return getString(R.string.hint_duration_half);
+        if ("quarter".equals(duration)) return getString(R.string.hint_duration_quarter);
+        if ("eighth".equals(duration)) return getString(R.string.hint_duration_eighth);
+        if ("16th".equals(duration)) return getString(R.string.hint_duration_sixteenth);
+        return duration == null ? "?" : duration;
     }
 
     private String toEuropean(String fullName) {
