@@ -23,7 +23,7 @@ public class PitchOverlayView extends View {
     private static final float STAFF_LINE_GAP_FOR_12_NOTES_PX = 36f;
     private static final float STAFF_PANEL_MIN_HEIGHT_PX = STAFF_LINE_GAP_FOR_12_NOTES_PX * LEDGER_STAFF_SPAN_IN_GAPS;
     private static final float LABEL_PANEL_MIN_HEIGHT_PX = 42f;
-    private static final float SPECTROGRAM_PANEL_BASE_HEIGHT_PX = 150f;
+    private static final float SPECTROGRAM_PANEL_BASE_HEIGHT_PX = 300f;
     private static final int REFERENCE_NOTE_COUNT = 56;
     private static final float BASE_LABEL_TEXT_SIZE_PX = 28f;
     private static final float MIN_LABEL_TEXT_SIZE_PX = 14f;
@@ -166,7 +166,9 @@ public class PitchOverlayView extends View {
             return;
         }
         int needed = (int) Math.ceil(minHeightPx);
-        if (lp.height != needed) {
+        boolean hasFixedOrExpandedHeight = lp.height == android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                || lp.height >= needed;
+        if (!hasFixedOrExpandedHeight) {
             lp.height = needed;
             setLayoutParams(lp);
             requestLayout();
