@@ -7,6 +7,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 
+import tatar.eljah.MainActivity;
 import tatar.eljah.fluitblox.R;
 
 public class SettingsActivity extends AppCompatActivity {
@@ -62,6 +63,9 @@ public class SettingsActivity extends AppCompatActivity {
                 if (index >= 0 && index < LANG_CODES.length) {
                     AppLocaleManager.saveAndApply(SettingsActivity.this, LANG_CODES[index]);
                     setResult(RESULT_OK);
+                    android.content.Intent home = new android.content.Intent(SettingsActivity.this, MainActivity.class);
+                    home.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(home);
                 }
                 finish();
             }

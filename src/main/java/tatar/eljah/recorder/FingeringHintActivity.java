@@ -101,6 +101,6 @@ public class FingeringHintActivity extends AppCompatActivity {
         } catch (NumberFormatException ex) {
             return fullName;
         }
-        return MusicNotation.toEuropeanLabel(note, octave);
+        return MusicNotation.toLocalizedLabel(this, note, octave);
     }
 }

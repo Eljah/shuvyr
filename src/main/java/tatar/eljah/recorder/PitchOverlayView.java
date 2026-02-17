@@ -38,6 +38,7 @@ public class PitchOverlayView extends View {
     private final List<Float> history = new ArrayList<Float>();
     private final List<float[]> spectrumHistory = new ArrayList<float[]>();
     private final List<NoteDrawInfo> noteDrawInfos = new ArrayList<NoteDrawInfo>();
+    private final List<LabelHitInfo> labelHitInfos = new ArrayList<LabelHitInfo>();
 
     private final Paint mismatchNotePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mismatchLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -76,6 +77,7 @@ public class PitchOverlayView extends View {
         mismatchLabelPaint.setTextSize(28f);
 
         durationMismatchNotePaint.setColor(Color.parseColor("#FB8C00"));
+        durationMismatchNotePaint.setTextSize(28f);
 
         noteStrokePaint.setColor(Color.BLACK);
         noteStrokePaint.setStrokeWidth(3f);
@@ -171,6 +173,7 @@ public class PitchOverlayView extends View {
 
         if (notes.isEmpty()) {
             noteDrawInfos.clear();
+            labelHitInfos.clear();
             return;
         }
 
@@ -185,6 +188,7 @@ public class PitchOverlayView extends View {
         List<Float> lastLabelRight = new ArrayList<Float>();
 
         noteDrawInfos.clear();
+        labelHitInfos.clear();
         for (int i = 0; i < notes.size(); i++) {
             NoteEvent note = notes.get(i);
             float x = leftPad + available * ((float) i / Math.max(1, notes.size() - 1));
@@ -213,7 +217,7 @@ public class PitchOverlayView extends View {
             textLeft = Math.max(0f, Math.min(w - textWidth, textLeft));
             lastLabelRight.set(row, textLeft + textWidth);
 
-            labelsToDraw.add(new LabelLayout(label, textLeft, row, i == pointer, mismatch, durationMismatch));
+            labelsToDraw.add(new LabelLayout(i, label, textLeft, row, (matched || i == pointer), mismatch, durationMismatch));
             noteDrawInfos.add(new NoteDrawInfo(i, x, y, Math.max(noteRadius * 2f, 28f)));
         }
 
@@ -231,6 +235,12 @@ public class PitchOverlayView extends View {
             Paint textPaint = labelLayout.mismatch ? mismatchLabelPaint : (labelLayout.durationMismatch ? durationMismatchNotePaint : (labelLayout.active ? activeLabelPaint : labelPaint));
             float textY = firstBaselineY + labelLayout.y * baselineStep;
             canvas.drawText(labelLayout.text, labelLayout.x, textY, textPaint);
+
+            Paint.FontMetrics metrics = textPaint.getFontMetrics();
+            float textWidth = textPaint.measureText(labelLayout.text);
+            float top = textY + metrics.ascent;
+            float bottom = textY + metrics.descent;
+            labelHitInfos.add(new LabelHitInfo(labelLayout.index, labelLayout.x, top, labelLayout.x + textWidth, bottom));
         }
     }
 
@@ -306,13 +316,29 @@ public class PitchOverlayView extends View {
         if (event.getAction() != MotionEvent.ACTION_UP) return true;
         if (playedNoteClickListener == null) return true;
         float touchX = event.getX(); float touchY = event.getY();
+
+        for (LabelHitInfo labelHitInfo : labelHitInfos) {
+            if (touchX >= labelHitInfo.left && touchX <= labelHitInfo.right
+                    && touchY >= labelHitInfo.top && touchY <= labelHitInfo.bottom) {
+                int index = labelHitInfo.index;
+                String actual = hasMismatch(index) ? mismatchActualByIndex.get(index)
+                        : (isMatched(index) ? matchedActualByIndex.get(index) : null);
+                NoteEvent expected = notes.get(index);
+                playedNoteClickListener.onPlayedNoteClick(index, expected.fullName(), actual);
+                return true;
+            }
+        }
+
         for (NoteDrawInfo info : noteDrawInfos) {
-            boolean mismatch = hasMismatch(info.index); boolean matched = isMatched(info.index); if (!mismatch && !matched) continue;
             float dx = touchX - info.cx; float dy = touchY - info.cy;
             if (dx * dx + dy * dy <= info.hitRadius * info.hitRadius) {
-                String actual = mismatch ? mismatchActualByIndex.get(info.index) : matchedActualByIndex.get(info.index);
+                boolean mismatch = hasMismatch(info.index);
+                boolean matched = isMatched(info.index);
+                String actual = mismatch ? mismatchActualByIndex.get(info.index)
+                        : (matched ? matchedActualByIndex.get(info.index) : null);
                 NoteEvent expected = notes.get(info.index);
-                playedNoteClickListener.onPlayedNoteClick(info.index, expected.fullName(), actual); return true;
+                playedNoteClickListener.onPlayedNoteClick(info.index, expected.fullName(), actual);
+                return true;
             }
         }
         return true;
@@ -356,8 +382,11 @@ public class PitchOverlayView extends View {
         return index % 2 == 0 ? -computedOffset : computedOffset;
     }
 
-    private static final class LabelLayout { private final String text; private final float x; private final float y; private final boolean active; private final boolean mismatch; private final boolean durationMismatch;
-        private LabelLayout(String text, float x, float y, boolean active, boolean mismatch, boolean durationMismatch) { this.text = text; this.x = x; this.y = y; this.active = active; this.mismatch = mismatch; this.durationMismatch = durationMismatch; } }
+    private static final class LabelLayout { private final int index; private final String text; private final float x; private final float y; private final boolean active; private final boolean mismatch; private final boolean durationMismatch;
+        private LabelLayout(int index, String text, float x, float y, boolean active, boolean mismatch, boolean durationMismatch) { this.index = index; this.text = text; this.x = x; this.y = y; this.active = active; this.mismatch = mismatch; this.durationMismatch = durationMismatch; } }
+
+    private static final class LabelHitInfo { private final int index; private final float left; private final float top; private final float right; private final float bottom;
+        private LabelHitInfo(int index, float left, float top, float right, float bottom) { this.index = index; this.left = left; this.top = top; this.right = right; this.bottom = bottom; } }
 
     private void drawSpectrogram(Canvas canvas, float w, float top, float bottom) {
         if (bottom <= top) return;
