@@ -19,11 +19,12 @@ public class PitchOverlayView extends View {
     private static final float STAFF_BOTTOM_PADDING_PX = 12f;
     private static final float NOTE_LABEL_BLOCK_GAP_PX = 14f;
     private static final float PANEL_BOTTOM_PADDING_PX = 8f;
-    private static final float STAFF_PANEL_MIN_HEIGHT_PX = 92f;
+    private static final float LEDGER_STAFF_SPAN_IN_GAPS = 7f; // 1.5 above + 4 staff + 1.5 below
+    private static final float STAFF_LINE_GAP_FOR_12_NOTES_PX = 18f;
+    private static final float STAFF_PANEL_MIN_HEIGHT_PX = STAFF_LINE_GAP_FOR_12_NOTES_PX * LEDGER_STAFF_SPAN_IN_GAPS;
     private static final float LABEL_PANEL_MIN_HEIGHT_PX = 42f;
     private static final float SPECTROGRAM_PANEL_MIN_HEIGHT_PX = 88f;
     private static final int REFERENCE_NOTE_COUNT = 56;
-    private static final float LEDGER_STAFF_SPAN_IN_GAPS = 7f; // 1.5 above + 4 staff + 1.5 below
 
     private final Paint staffPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);

@@ -131,6 +131,40 @@ public class RecorderNoteMapper {
         if (FINGERINGS.containsKey(note)) {
             return FINGERINGS.get(note);
         }
-        return "нет данных";
+        String fallback = nearestFingering(note);
+        return fallback == null ? "нет данных" : fallback;
+    }
+
+    private String nearestFingering(String note) {
+        if (note == null || note.length() < 2) {
+            return null;
+        }
+        int octave;
+        String name;
+        try {
+            octave = Integer.parseInt(note.substring(note.length() - 1));
+            name = note.substring(0, note.length() - 1);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+
+        int targetMidi = MusicNotation.midiFor(name, octave);
+        String closestKey = null;
+        int minDistance = Integer.MAX_VALUE;
+        for (String key : FINGERINGS.keySet()) {
+            if (key.length() < 2) continue;
+            try {
+                int keyOctave = Integer.parseInt(key.substring(key.length() - 1));
+                String keyName = key.substring(0, key.length() - 1);
+                int keyMidi = MusicNotation.midiFor(keyName, keyOctave);
+                int distance = Math.abs(keyMidi - targetMidi);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestKey = key;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return closestKey == null ? null : FINGERINGS.get(closestKey);
     }
 }
