@@ -13,6 +13,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.CheckBox;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -119,13 +121,13 @@ public class ScorePlayActivity extends AppCompatActivity {
             }
         });
 
-        final RadioButton simplifiedModeButton = findViewById(R.id.radio_simplified_mode);
-        simplifiedMode = simplifiedModeButton != null && simplifiedModeButton.isChecked();
-        if (simplifiedModeButton != null) {
-            simplifiedModeButton.setOnClickListener(new View.OnClickListener() {
+        final CheckBox simplifiedModeCheck = findViewById(R.id.check_simplified_mode);
+        simplifiedMode = simplifiedModeCheck != null && simplifiedModeCheck.isChecked();
+        if (simplifiedModeCheck != null) {
+            simplifiedModeCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                 @Override
-                public void onClick(View v) {
-                    simplifiedMode = simplifiedModeButton.isChecked();
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    simplifiedMode = isChecked;
                 }
             });
         }
@@ -242,7 +244,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                 toEuropeanLabelFromFull(detected),
                 (int) normalizedHz));
 
-        if (!samePitch(detected, expectedName, simplifiedMode)) {
+        if (!PitchMatchUtil.samePitch(detected, expectedName, simplifiedMode)) {
             if (shouldDeferTablatureMismatch(detected)) {
                 return;
             }
@@ -733,7 +735,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         for (NoteEvent note : piece.notes) {
             String expected = note.fullName();
             String synthesized = mapper.fromFrequency((float) resolveTablatureFrequency(note));
-            if (samePitch(expected, synthesized, false)) {
+            if (PitchMatchUtil.samePitch(expected, synthesized, simplifiedMode)) {
                 exactMatches++;
             } else {
                 Log.w(TAG, "Tablature frequency label mismatch: expected=" + expected + ", synthesized=" + synthesized);
@@ -744,38 +746,6 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private double midiToFrequency(int midi) {
         return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
-    }
-
-    private boolean samePitch(String firstFullName, String secondFullName, boolean simplifiedAccidentalsMode) {
-        if (firstFullName == null || secondFullName == null) {
-            return false;
-        }
-        if (firstFullName.equals(secondFullName)) {
-            return true;
-        }
-        if (firstFullName.length() < 2 || secondFullName.length() < 2) {
-            return false;
-        }
-        try {
-            String firstNote = firstFullName.substring(0, firstFullName.length() - 1);
-            int firstOctave = Integer.parseInt(firstFullName.substring(firstFullName.length() - 1));
-            String secondNote = secondFullName.substring(0, secondFullName.length() - 1);
-            int secondOctave = Integer.parseInt(secondFullName.substring(secondFullName.length() - 1));
-            if (simplifiedAccidentalsMode) {
-                return firstOctave == secondOctave
-                        && baseNoteLetter(firstNote).equals(baseNoteLetter(secondNote));
-            }
-            return MusicNotation.midiFor(firstNote, firstOctave) == MusicNotation.midiFor(secondNote, secondOctave);
-        } catch (NumberFormatException ex) {
-            return false;
-        }
-    }
-
-    private String baseNoteLetter(String noteName) {
-        if (noteName == null || noteName.length() == 0) {
-            return "";
-        }
-        return String.valueOf(Character.toUpperCase(noteName.charAt(0)));
     }
 
     private String toEuropeanLabelFromFull(String fullName) {
