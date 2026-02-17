@@ -264,7 +264,9 @@ public class ScorePlayActivity extends AppCompatActivity {
     }
 
     private void setPointerWithTracking(int newPointer) {
-        pointer = newPointer;
+        if (newPointer >= 0) {
+            pointer = newPointer;
+        }
         pointerUpdatedAtMs = SystemClock.elapsedRealtime();
         resetTablatureMismatchTracking();
         overlayView.setPointer(newPointer);
