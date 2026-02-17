@@ -30,4 +30,19 @@
         android:layout_marginTop="16dp"
         android:text="@string/settings_apply" />
 
+
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="@string/settings_audio_section" />
+
+    <Button
+        android:id="@+id/btn_open_audio_calibration"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/settings_open_audio_calibration" />
+
 </LinearLayout>

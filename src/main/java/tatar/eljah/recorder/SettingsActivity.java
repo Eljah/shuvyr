@@ -48,6 +48,13 @@ public class SettingsActivity extends AppCompatActivity {
         spinner.setSelection(selected);
 
         Button apply = findViewById(R.id.btn_apply_settings);
+        Button audioCalibration = findViewById(R.id.btn_open_audio_calibration);
+        audioCalibration.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new android.content.Intent(SettingsActivity.this, AudioSettingsActivity.class));
+            }
+        });
         apply.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
