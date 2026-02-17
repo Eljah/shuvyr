@@ -6,7 +6,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 
 import tatar.eljah.fluitblox.R;
-import tatar.eljah.recorder.AudioSettingsActivity;
+import tatar.eljah.recorder.SettingsActivity;
 import tatar.eljah.recorder.CaptureSheetActivity;
 import tatar.eljah.recorder.LibraryActivity;
 
@@ -14,6 +14,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        tatar.eljah.recorder.AppLocaleManager.applySavedLocale(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -38,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, AudioSettingsActivity.class));
+                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
             }
         });
     }

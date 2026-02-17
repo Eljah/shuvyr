@@ -1,14 +1,33 @@
 <resources>
-    <string name="app_name">Fluitebox</string>
-    <string name="main_title">Fluitebox</string>
+    <string name="app_name">Fluiteblox</string>
+    <string name="main_title">Fluiteblox</string>
     <string name="main_capture">1) Сфотографировать ноты</string>
     <string name="main_library">2) Библиотека произведений</string>
-    <string name="main_settings">3) Настройки аудио</string>
+    <string name="main_settings">3) Настройки</string>
 
     <string name="settings_title">Настройки распознавания</string>
     <string name="settings_threshold_value_default">Порог интенсивности: 0.030</string>
     <string name="settings_threshold_value_template">Порог интенсивности: %.3f</string>
     <string name="settings_hint">Тапните по графику интенсивности, чтобы задать порог выше шумов.</string>
+
+    <string name="settings_menu_title">Настройки</string>
+    <string name="settings_language">Язык и локализация</string>
+    <string name="settings_apply">Применить</string>
+    <string name="settings_audio_section">Аудио-калибровка</string>
+    <string name="settings_open_audio_calibration">Открыть калибровку микрофона</string>
+
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_french">Français</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_tatar">Татарча</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_arabic">العربية</string>
 
     <string name="capture_title">Сканирование нотного стана</string>
     <string name="capture_piece_name_hint">Название произведения</string>
@@ -27,6 +46,13 @@
     <string name="library_title">Библиотека</string>
     <string name="library_empty">Библиотека пуста. Добавьте первое произведение.</string>
     <string name="library_back">Назад в меню</string>
+
+    <string name="library_export_title">Экспорт: %1$s</string>
+    <string name="library_export_musicxml">Экспорт в MusicXML</string>
+    <string name="library_export_midi">Экспорт в MIDI</string>
+    <string name="library_export_success">Файл сохранен: %1$s</string>
+    <string name="library_export_error">Не удалось экспортировать файл.</string>
+    <string name="library_export_hint">Долгое нажатие по произведению — экспорт MusicXML/MIDI</string>
 
     <string name="play_waiting">Ожидание аудио от микрофона…</string>
     <string name="play_no_piece">Произведение не найдено.</string>

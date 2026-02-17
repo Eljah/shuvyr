@@ -3,10 +3,12 @@ package tatar.eljah.recorder;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AlertDialog;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,11 +45,49 @@ public class LibraryActivity extends AppCompatActivity {
             }
         });
 
+        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                if (pieces.isEmpty()) {
+                    return true;
+                }
+                showExportDialog(pieces.get(position));
+                return true;
+            }
+        });
+
         findViewById(R.id.btn_library_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 finish();
             }
         });
+    }
+
+    private void showExportDialog(final ScorePiece piece) {
+        String[] options = new String[]{
+                getString(R.string.library_export_musicxml),
+                getString(R.string.library_export_midi)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.library_export_title, piece.title))
+                .setItems(options, new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        exportPiece(piece, which == 0);
+                    }
+                })
+                .show();
+    }
+
+    private void exportPiece(ScorePiece piece, boolean xml) {
+        try {
+            java.io.File file = xml
+                    ? ScoreExportUtil.exportMusicXml(this, piece)
+                    : ScoreExportUtil.exportMidi(this, piece);
+            Toast.makeText(this, getString(R.string.library_export_success, file.getAbsolutePath()), Toast.LENGTH_LONG).show();
+        } catch (Exception error) {
+            Toast.makeText(this, getString(R.string.library_export_error), Toast.LENGTH_LONG).show();
+        }
     }
 }
