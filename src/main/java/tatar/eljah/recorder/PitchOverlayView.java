@@ -15,7 +15,11 @@ import java.util.List;
 public class PitchOverlayView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 3000f;
     private static final float NOTE_LABEL_MIN_GAP_PX = 2f;
-    private static final float SPECTROGRAM_TOP_PADDING_PX = 34f;
+    private static final float STAFF_TOP_PADDING_PX = 10f;
+    private static final float STAFF_BOTTOM_PADDING_PX = 12f;
+    private static final float NOTE_LABEL_BLOCK_GAP_PX = 14f;
+    private static final float NOTE_LABEL_ROW_GAP_PX = 18f;
+    private static final float SPECTROGRAM_TOP_PADDING_PX = 24f;
 
     private final Paint staffPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -144,42 +148,47 @@ public class PitchOverlayView extends View {
         float w = getWidth();
         float h = getHeight();
 
-        float topH = h * 0.52f;
-        drawStaffAndNotes(canvas, w, topH);
-        drawSpectrogram(canvas, w, h, topH);
+        float staffTop = STAFF_TOP_PADDING_PX;
+        float staffBottom = h * 0.42f - STAFF_BOTTOM_PADDING_PX;
+        if (staffBottom <= staffTop + 40f) {
+            staffBottom = staffTop + 40f;
+        }
+
+        float labelsBottom = drawStaffAndNotes(canvas, w, staffTop, staffBottom);
+
+        float spectrogramTop = labelsBottom + SPECTROGRAM_TOP_PADDING_PX;
+        float spectrogramBottom = h - 8f;
+        drawSpectrogram(canvas, w, spectrogramTop, spectrogramBottom);
     }
 
-    private void drawStaffAndNotes(Canvas canvas, float w, float topH) {
-        float lineGap = topH / 8f;
-        float firstLineY = lineGap * 1.5f;
+    private float drawStaffAndNotes(Canvas canvas, float w, float staffTop, float staffBottom) {
+        float drawableStaffHeight = Math.max(1f, staffBottom - staffTop);
+        float lineGap = drawableStaffHeight / 6f;
+        float firstLineY = staffTop + lineGap;
+        float bottomLineY = firstLineY + lineGap * 4f;
         for (int i = 0; i < 5; i++) {
             float y = firstLineY + i * lineGap;
             canvas.drawLine(0, y, w, y, staffPaint);
         }
 
         if (notes.isEmpty()) {
-            return;
+            return bottomLineY + NOTE_LABEL_BLOCK_GAP_PX;
         }
 
         float leftPad = 26f;
         float rightPad = 20f;
         float available = Math.max(1f, w - leftPad - rightPad);
         float noteStep = notes.size() <= 1 ? available : available / (notes.size() - 1);
-        float noteRadius = Math.max(8f, Math.min(lineGap * 0.55f, noteStep * 0.48f));
-        float minMidi = Float.MAX_VALUE;
-        float maxMidi = Float.MIN_VALUE;
-        for (NoteEvent note : notes) {
-            int midi = MusicNotation.midiFor(note.noteName, note.octave);
-            minMidi = Math.min(minMidi, midi);
-            maxMidi = Math.max(maxMidi, midi);
-        }
+        float noteRadius = Math.max(8f, Math.min(lineGap * 0.58f, noteStep * 0.48f));
 
         List<LabelLayout> labelsToDraw = new ArrayList<LabelLayout>();
+        float labelStartY = bottomLineY + NOTE_LABEL_BLOCK_GAP_PX;
+        float labelRowGap = Math.max(NOTE_LABEL_ROW_GAP_PX, lineGap * 0.72f);
         float[] labelRows = new float[]{
-                firstLineY + lineGap * 5.35f,
-                firstLineY + lineGap * 5.85f,
-                firstLineY + lineGap * 6.35f,
-                firstLineY + lineGap * 6.85f
+                labelStartY,
+                labelStartY + labelRowGap,
+                labelStartY + labelRowGap * 2f,
+                labelStartY + labelRowGap * 3f
         };
         float[] lastLabelRight = new float[]{Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
 
@@ -187,8 +196,7 @@ public class PitchOverlayView extends View {
         for (int i = 0; i < notes.size(); i++) {
             NoteEvent note = notes.get(i);
             float x = leftPad + available * ((float) i / Math.max(1, notes.size() - 1));
-            int midi = MusicNotation.midiFor(note.noteName, note.octave);
-            float y = yForMidiAdaptive(midi, minMidi, maxMidi, firstLineY, lineGap);
+            float y = yForStaffStep(note, bottomLineY, lineGap);
             boolean mismatch = hasMismatch(i);
             Paint circlePaint = mismatch ? mismatchNotePaint : (i == pointer ? activeNotePaint : notePaint);
             canvas.drawOval(new RectF(x - noteRadius, y - noteRadius * 0.75f, x + noteRadius, y + noteRadius * 0.75f), circlePaint);
@@ -234,6 +242,7 @@ public class PitchOverlayView extends View {
                     : (labelLayout.active ? activeLabelPaint : labelPaint);
             canvas.drawText(labelLayout.text, labelLayout.x, labelLayout.y, textPaint);
         }
+        return labelRows[labelRows.length - 1];
     }
 
     private boolean hasMismatch(int index) {
@@ -294,9 +303,8 @@ public class PitchOverlayView extends View {
         }
     }
 
-    private void drawSpectrogram(Canvas canvas, float w, float h, float topH) {
-        float startY = topH + SPECTROGRAM_TOP_PADDING_PX;
-        float bottom = h - 8f;
+    private void drawSpectrogram(Canvas canvas, float w, float top, float bottom) {
+        float startY = top;
         if (bottom <= startY) {
             return;
         }
@@ -379,15 +387,30 @@ public class PitchOverlayView extends View {
         return max;
     }
 
-    private float yForMidiAdaptive(int midi, float minMidi, float maxMidi, float firstLineY, float lineGap) {
-        float noteTop = firstLineY - lineGap * 1.2f;
-        float noteBottom = firstLineY + lineGap * 4.2f;
-        if (maxMidi <= minMidi) {
-            return (noteTop + noteBottom) * 0.5f;
+    private float yForStaffStep(NoteEvent note, float bottomLineY, float lineGap) {
+        int step = diatonicStepFromBottomLineE4(note.noteName, note.octave);
+        return bottomLineY - step * (lineGap / 2f);
+    }
+
+    private int diatonicStepFromBottomLineE4(String noteName, int octave) {
+        int letterIndex = letterIndex(noteName);
+        int absolute = octave * 7 + letterIndex;
+        int e4Absolute = 4 * 7 + 2; // E4 = bottom line of treble staff
+        return absolute - e4Absolute;
+    }
+
+    private int letterIndex(String noteName) {
+        if (noteName == null || noteName.length() == 0) {
+            return 0;
         }
-        float ratio = (midi - minMidi) / (maxMidi - minMidi);
-        ratio = Math.max(0f, Math.min(1f, ratio));
-        return noteBottom - ratio * (noteBottom - noteTop);
+        char letter = Character.toUpperCase(noteName.charAt(0));
+        if (letter == "C".charAt(0)) return 0;
+        if (letter == "D".charAt(0)) return 1;
+        if (letter == "E".charAt(0)) return 2;
+        if (letter == "F".charAt(0)) return 3;
+        if (letter == "G".charAt(0)) return 4;
+        if (letter == "A".charAt(0)) return 5;
+        return 6;
     }
 
     private static final class NoteDrawInfo {

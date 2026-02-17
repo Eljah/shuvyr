@@ -80,8 +80,8 @@ public class ScorePlayActivity extends AppCompatActivity {
                     return;
                 }
                 Intent intent = new Intent(ScorePlayActivity.this, FingeringHintActivity.class);
-                intent.putExtra("expected", toEuropeanLabelFromFull(expectedFullName));
-                intent.putExtra("actual", toEuropeanLabelFromFull(actualFullName));
+                intent.putExtra("expected", expectedFullName);
+                intent.putExtra("actual", actualFullName);
                 startActivity(intent);
             }
         });
