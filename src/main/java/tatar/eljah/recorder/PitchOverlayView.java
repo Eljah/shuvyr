@@ -355,9 +355,14 @@ public class PitchOverlayView extends View {
 
         float noteDiameter = noteRadius * 2f;
         float[] extraGapBySegment = new float[count - 1];
-        applyBoundaryGap(extraGapBySegment, pointer - 2, noteDiameter * BOUNDARY_GAP_TWO_AWAY_NOTE_DIAMETERS);
-        applyBoundaryGap(extraGapBySegment, pointer - 1, noteDiameter * BOUNDARY_GAP_ONE_AWAY_NOTE_DIAMETERS);
-        applyBoundaryGap(extraGapBySegment, pointer, noteDiameter * BOUNDARY_GAP_TWO_AWAY_NOTE_DIAMETERS);
+        // pointer = current expected note, so played/next boundary is between (pointer - 1) and pointer.
+        int boundarySegmentIndex = pointer - 1;
+        applyBoundaryGap(extraGapBySegment, boundarySegmentIndex - 1,
+                noteDiameter * BOUNDARY_GAP_TWO_AWAY_NOTE_DIAMETERS);
+        applyBoundaryGap(extraGapBySegment, boundarySegmentIndex,
+                noteDiameter * BOUNDARY_GAP_ONE_AWAY_NOTE_DIAMETERS);
+        applyBoundaryGap(extraGapBySegment, boundarySegmentIndex + 1,
+                noteDiameter * BOUNDARY_GAP_TWO_AWAY_NOTE_DIAMETERS);
 
         float totalExtra = 0f;
         for (float extra : extraGapBySegment) {
