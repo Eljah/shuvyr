@@ -60,8 +60,8 @@
             android:layout_height="wrap_content"
             android:text="@string/play_restart" />
 
-        <RadioButton
-            android:id="@+id/radio_simplified_mode"
+        <CheckBox
+            android:id="@+id/check_simplified_mode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"

@@ -40,6 +40,7 @@ public class PitchOverlayView extends View {
     private final Paint durationMismatchNotePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint durationPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint noteStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint stemPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private OnPlayedNoteClickListener playedNoteClickListener;
     private final List<String> mismatchActualByIndex = new ArrayList<String>();
@@ -79,6 +80,10 @@ public class PitchOverlayView extends View {
         noteStrokePaint.setColor(Color.BLACK);
         noteStrokePaint.setStrokeWidth(3f);
         noteStrokePaint.setStyle(Paint.Style.STROKE);
+
+        stemPaint.setStyle(Paint.Style.STROKE);
+        stemPaint.setStrokeCap(Paint.Cap.ROUND);
+        stemPaint.setStrokeWidth(noteStrokePaint.getStrokeWidth() * 2f);
 
         expectedPaint.setColor(Color.parseColor("#8E24AA"));
         expectedPaint.setStrokeWidth(1.5f);
@@ -266,7 +271,9 @@ public class PitchOverlayView extends View {
             Paint circlePaint = mismatch
                     ? mismatchNotePaint
                     : (durationMismatch ? durationMismatchNotePaint : ((matched || i == pointer) ? activeNotePaint : notePaint));
-            drawDurationAwareNote(canvas, note, x, y, noteRadius, circlePaint);
+            boolean stemUp = stemUpForNote(i, y, firstLineY, bottomLineY, noteStep, noteRadius);
+            float stemOffsetX = stemOffsetForIndex(i, noteStep, noteRadius);
+            drawDurationAwareNote(canvas, note, x, y, noteRadius, stemOffsetX, stemUp, circlePaint);
 
             String label = MusicNotation.toEuropeanLabel(note.noteName, note.octave);
             float textWidth = labelPaint.measureText(label);
@@ -383,7 +390,7 @@ public class PitchOverlayView extends View {
         void onPlayedNoteClick(int index, String expectedFullName, String actualFullName);
     }
 
-    private void drawDurationAwareNote(Canvas canvas, NoteEvent note, float x, float y, float noteRadius, Paint fillPaint) {
+    private void drawDurationAwareNote(Canvas canvas, NoteEvent note, float x, float y, float noteRadius, float stemOffsetX, boolean stemUp, Paint fillPaint) {
         RectF oval = new RectF(x - noteRadius, y - noteRadius * 0.75f, x + noteRadius, y + noteRadius * 0.75f);
         String duration = note == null ? null : note.duration;
         boolean whole = "whole".equals(duration);
@@ -401,19 +408,43 @@ public class PitchOverlayView extends View {
             return;
         }
 
-        float stemX = x + noteRadius * 0.9f;
-        float stemTop = y - noteRadius * 2.6f;
-        float stemBottom = y;
-        canvas.drawLine(stemX, stemBottom, stemX, stemTop, fillPaint);
+        float stemAnchorX = stemUp ? (x + noteRadius * 0.86f) : (x - noteRadius * 0.86f);
+        float stemX = stemAnchorX + stemOffsetX;
+        float noteEdgeY = y + (stemUp ? (-noteRadius * 0.58f) : (noteRadius * 0.58f));
+        float stemEndY = y + (stemUp ? (-noteRadius * 2.6f) : (noteRadius * 2.6f));
+        stemPaint.setColor(fillPaint.getColor());
+        canvas.drawLine(stemX, noteEdgeY, stemX, stemEndY, stemPaint);
 
         int flags = flagCountForDuration(duration);
         for (int f = 0; f < flags; f++) {
-            float flagStartY = stemTop + f * (noteRadius * 0.75f);
-            float flagControlX = stemX + noteRadius * 0.9f;
-            float flagEndX = stemX + noteRadius * 1.6f;
-            float flagEndY = flagStartY + noteRadius * 0.55f;
-            canvas.drawLine(stemX, flagStartY, flagEndX, flagEndY, fillPaint);
+            float flagStartY = stemEndY + (stemUp ? 1f : -1f) * f * (noteRadius * 0.75f);
+            float flagEndX = stemX + (stemUp ? 1f : -1f) * noteRadius * 1.6f;
+            float flagEndY = flagStartY + (stemUp ? 1f : -1f) * noteRadius * 0.55f;
+            canvas.drawLine(stemX, flagStartY, flagEndX, flagEndY, stemPaint);
         }
+    }
+
+    private boolean stemUpForNote(int index, float noteY, float topLineY, float bottomLineY, float noteStep, float noteRadius) {
+        float middleLineY = (topLineY + bottomLineY) * 0.5f;
+        boolean denseLayout = noteStep < noteRadius * 1.9f;
+        if (denseLayout) {
+            // In dense layouts alternate direction so stems do not stack and can be drawn downward too.
+            return index % 2 == 0;
+        }
+        // Keep unified traditional style: upper notes go down, lower notes go up.
+        return noteY >= middleLineY;
+    }
+
+    private float stemOffsetForIndex(int index, float noteStep, float noteRadius) {
+        float minGapWithoutOffset = noteRadius * 1.9f;
+        if (noteStep >= minGapWithoutOffset) {
+            return 0f;
+        }
+
+        float overlap = minGapWithoutOffset - noteStep;
+        float maxOffset = noteRadius * 0.65f;
+        float computedOffset = Math.min(maxOffset, overlap * 0.5f);
+        return index % 2 == 0 ? -computedOffset : computedOffset;
     }
 
     private static final class LabelLayout {
