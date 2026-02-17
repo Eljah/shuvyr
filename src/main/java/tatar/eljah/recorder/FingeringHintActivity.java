@@ -17,6 +17,7 @@ public class FingeringHintActivity extends AppCompatActivity {
         int noteIndex = getIntent().getIntExtra("note_index", -1);
         boolean durationMismatch = getIntent().getBooleanExtra("duration_mismatch", false);
         String expectedDuration = getIntent().getStringExtra("expected_duration");
+        long actualDurationMs = getIntent().getLongExtra("actual_duration_ms", -1L);
         RecorderNoteMapper mapper = new RecorderNoteMapper();
 
         String expectedLabel = toEuropean(expectedFullName);
@@ -27,10 +28,13 @@ public class FingeringHintActivity extends AppCompatActivity {
         }
 
         TextView durationHintView = findViewById(R.id.text_duration_hint);
+        String expectedDurationLabel = durationLabel(expectedDuration);
+        String actualDurationLabel = actualDurationMs > 0L ? durationLabel(durationFromMs(actualDurationMs)) : getString(R.string.hint_duration_unknown);
+        long safeActualDurationMs = Math.max(0L, actualDurationMs);
         if (durationMismatch) {
-            durationHintView.setText(getString(R.string.hint_duration_mismatch, durationLabel(expectedDuration)));
+            durationHintView.setText(getString(R.string.hint_duration_mismatch, expectedDurationLabel, actualDurationLabel, safeActualDurationMs));
         } else {
-            durationHintView.setText(R.string.hint_duration_ok);
+            durationHintView.setText(getString(R.string.hint_duration_ok, expectedDurationLabel, actualDurationLabel));
         }
 
         ((TextView) findViewById(R.id.text_expected_note)).setText(getString(
@@ -48,6 +52,24 @@ public class FingeringHintActivity extends AppCompatActivity {
             return "";
         }
         return fullName.trim();
+    }
+
+
+    private String durationFromMs(long durationMs) {
+        if (durationMs <= 0L) return null;
+        String[] keys = new String[]{"16th", "eighth", "quarter", "half", "whole"};
+        long[] values = new long[]{120L, 240L, 450L, 900L, 1800L};
+
+        int bestIndex = 0;
+        long bestDiff = Long.MAX_VALUE;
+        for (int i = 0; i < values.length; i++) {
+            long diff = Math.abs(durationMs - values[i]);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIndex = i;
+            }
+        }
+        return keys[bestIndex];
     }
 
     private String durationLabel(String duration) {

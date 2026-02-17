@@ -61,6 +61,7 @@ public class ScorePlayActivity extends AppCompatActivity {
     private int consecutiveTablatureMismatchFrames;
     private String lastTablatureMismatchPitch;
     private long lastMatchAcceptedAtMs;
+    private long[] actualDurationMsByIndex;
     private boolean simplifiedMode;
 
     @Override
@@ -82,6 +83,10 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         ((TextView) findViewById(R.id.text_piece_title)).setText(piece.title);
         overlayView.setNotes(piece.notes);
+        actualDurationMsByIndex = new long[piece.notes.size()];
+        for (int i = 0; i < actualDurationMsByIndex.length; i++) {
+            actualDurationMsByIndex[i] = -1L;
+        }
         resetMatchCadenceTracking();
         setPointerWithTracking(-1);
         if (!piece.notes.isEmpty()) {
@@ -98,6 +103,9 @@ public class ScorePlayActivity extends AppCompatActivity {
                 intent.putExtra("duration_mismatch", overlayView.isDurationMismatch(index));
                 if (piece != null && index >= 0 && index < piece.notes.size()) {
                     intent.putExtra("expected_duration", piece.notes.get(index).duration);
+                    if (actualDurationMsByIndex != null && index < actualDurationMsByIndex.length && actualDurationMsByIndex[index] > 0L) {
+                        intent.putExtra("actual_duration_ms", actualDurationMsByIndex[index]);
+                    }
                 }
                 startActivity(intent);
             }
@@ -274,6 +282,9 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         NoteEvent previousNote = piece.notes.get(currentIndex - 1);
         long actualDurationMs = now - lastMatchAcceptedAtMs;
+        if (actualDurationMsByIndex != null && currentIndex - 1 >= 0 && currentIndex - 1 < actualDurationMsByIndex.length) {
+            actualDurationMsByIndex[currentIndex - 1] = actualDurationMs;
+        }
         long expectedDurationMs = durationMs(previousNote.duration);
         long allowedDeviation = (long) (expectedDurationMs * DURATION_MISMATCH_TOLERANCE_FRACTION);
         long deviation = Math.abs(actualDurationMs - expectedDurationMs);
@@ -340,6 +351,11 @@ public class ScorePlayActivity extends AppCompatActivity {
     private void clearAllNoteStates() {
         if (piece == null) {
             return;
+        }
+        if (actualDurationMsByIndex != null) {
+            for (int i = 0; i < actualDurationMsByIndex.length; i++) {
+                actualDurationMsByIndex[i] = -1L;
+            }
         }
         for (int i = 0; i < piece.notes.size(); i++) {
             overlayView.clearMismatch(i);
