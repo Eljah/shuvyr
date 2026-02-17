@@ -1,6 +1,7 @@
 package tatar.eljah.recorder;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -72,6 +73,18 @@ public class ScorePlayActivity extends AppCompatActivity {
             NoteEvent firstExpected = piece.notes.get(pointer);
             overlayView.setFrequencies(expectedFrequencyFor(firstExpected), 0f);
         }
+        overlayView.setOnMismatchNoteClickListener(new PitchOverlayView.OnMismatchNoteClickListener() {
+            @Override
+            public void onMismatchNoteClick(int index, String expectedFullName, String actualFullName) {
+                if (actualFullName == null) {
+                    return;
+                }
+                Intent intent = new Intent(ScorePlayActivity.this, FingeringHintActivity.class);
+                intent.putExtra("expected", toEuropeanLabelFromFull(expectedFullName));
+                intent.putExtra("actual", toEuropeanLabelFromFull(actualFullName));
+                startActivity(intent);
+            }
+        });
 
         RadioGroup modeGroup = findViewById(R.id.group_play_mode);
         modeGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
@@ -187,9 +200,11 @@ public class ScorePlayActivity extends AppCompatActivity {
                 (int) normalizedHz));
 
         if (!detected.equals(expectedName)) {
+            overlayView.markMismatch(pointer, detected);
             return;
         }
 
+        overlayView.clearMismatch(pointer);
         pointer++;
         if (pointer < piece.notes.size()) {
             overlayView.setPointer(pointer);

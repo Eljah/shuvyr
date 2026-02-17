@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
@@ -28,6 +29,13 @@ public class PitchOverlayView extends View {
     private final List<NoteEvent> notes = new ArrayList<NoteEvent>();
     private final List<Float> history = new ArrayList<Float>();
     private final List<float[]> spectrumHistory = new ArrayList<float[]>();
+    private final List<NoteDrawInfo> noteDrawInfos = new ArrayList<NoteDrawInfo>();
+
+    private final Paint mismatchNotePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mismatchLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private OnMismatchNoteClickListener mismatchNoteClickListener;
+    private final List<String> mismatchActualByIndex = new ArrayList<String>();
 
     private float expectedHz;
     private float actualHz;
@@ -42,12 +50,16 @@ public class PitchOverlayView extends View {
 
         notePaint.setColor(Color.BLACK);
         activeNotePaint.setColor(Color.parseColor("#2E7D32"));
+        mismatchNotePaint.setColor(Color.parseColor("#C62828"));
 
         labelPaint.setColor(Color.parseColor("#424242"));
         labelPaint.setTextSize(28f);
 
         activeLabelPaint.setColor(Color.parseColor("#2E7D32"));
         activeLabelPaint.setTextSize(28f);
+
+        mismatchLabelPaint.setColor(Color.parseColor("#C62828"));
+        mismatchLabelPaint.setTextSize(28f);
 
         expectedPaint.setColor(Color.parseColor("#8E24AA"));
         expectedPaint.setStrokeWidth(1.5f);
@@ -61,7 +73,33 @@ public class PitchOverlayView extends View {
         if (pieceNotes != null) {
             notes.addAll(pieceNotes);
         }
+        mismatchActualByIndex.clear();
+        for (int i = 0; i < notes.size(); i++) {
+            mismatchActualByIndex.add(null);
+        }
         invalidate();
+    }
+
+    public void markMismatch(int index, String actualFullName) {
+        if (index < 0 || index >= notes.size()) {
+            return;
+        }
+        ensureMismatchCapacity();
+        mismatchActualByIndex.set(index, actualFullName);
+        invalidate();
+    }
+
+    public void clearMismatch(int index) {
+        if (index < 0 || index >= notes.size()) {
+            return;
+        }
+        ensureMismatchCapacity();
+        mismatchActualByIndex.set(index, null);
+        invalidate();
+    }
+
+    public void setOnMismatchNoteClickListener(OnMismatchNoteClickListener listener) {
+        this.mismatchNoteClickListener = listener;
     }
 
     public void setPointer(int pointer) {
@@ -127,7 +165,14 @@ public class PitchOverlayView extends View {
         float rightPad = 20f;
         float available = Math.max(1f, w - leftPad - rightPad);
         float noteStep = notes.size() <= 1 ? available : available / (notes.size() - 1);
-        float noteRadius = Math.max(2.5f, Math.min(lineGap * 0.35f, noteStep * 0.42f));
+        float noteRadius = Math.max(8f, Math.min(lineGap * 0.55f, noteStep * 0.48f));
+        float minMidi = Float.MAX_VALUE;
+        float maxMidi = Float.MIN_VALUE;
+        for (NoteEvent note : notes) {
+            int midi = MusicNotation.midiFor(note.noteName, note.octave);
+            minMidi = Math.min(minMidi, midi);
+            maxMidi = Math.max(maxMidi, midi);
+        }
 
         List<LabelLayout> labelsToDraw = new ArrayList<LabelLayout>();
         float[] labelRows = new float[]{
@@ -138,12 +183,15 @@ public class PitchOverlayView extends View {
         };
         float[] lastLabelRight = new float[]{Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
 
+        noteDrawInfos.clear();
         for (int i = 0; i < notes.size(); i++) {
             NoteEvent note = notes.get(i);
             float x = leftPad + available * ((float) i / Math.max(1, notes.size() - 1));
-            float y = yForMidi(MusicNotation.midiFor(note.noteName, note.octave), firstLineY, lineGap);
-            canvas.drawOval(new RectF(x - noteRadius, y - noteRadius * 0.75f, x + noteRadius, y + noteRadius * 0.75f),
-                    i == pointer ? activeNotePaint : notePaint);
+            int midi = MusicNotation.midiFor(note.noteName, note.octave);
+            float y = yForMidiAdaptive(midi, minMidi, maxMidi, firstLineY, lineGap);
+            boolean mismatch = hasMismatch(i);
+            Paint circlePaint = mismatch ? mismatchNotePaint : (i == pointer ? activeNotePaint : notePaint);
+            canvas.drawOval(new RectF(x - noteRadius, y - noteRadius * 0.75f, x + noteRadius, y + noteRadius * 0.75f), circlePaint);
 
             String label = MusicNotation.toEuropeanLabel(note.noteName, note.octave);
             float textWidth = labelPaint.measureText(label);
@@ -175,14 +223,59 @@ public class PitchOverlayView extends View {
             }
 
             textLeft = Math.max(minLeft, Math.min(maxLeft, textLeft));
-            labelsToDraw.add(new LabelLayout(label, textLeft, labelRows[selectedRow], i == pointer));
+            labelsToDraw.add(new LabelLayout(label, textLeft, labelRows[selectedRow], i == pointer, mismatch));
+            noteDrawInfos.add(new NoteDrawInfo(i, x, y, Math.max(noteRadius * 2f, 28f)));
             lastLabelRight[selectedRow] = textLeft + textWidth;
         }
 
         for (LabelLayout labelLayout : labelsToDraw) {
-            canvas.drawText(labelLayout.text, labelLayout.x, labelLayout.y,
-                    labelLayout.active ? activeLabelPaint : labelPaint);
+            Paint textPaint = labelLayout.mismatch
+                    ? mismatchLabelPaint
+                    : (labelLayout.active ? activeLabelPaint : labelPaint);
+            canvas.drawText(labelLayout.text, labelLayout.x, labelLayout.y, textPaint);
         }
+    }
+
+    private boolean hasMismatch(int index) {
+        ensureMismatchCapacity();
+        return index >= 0 && index < mismatchActualByIndex.size() && mismatchActualByIndex.get(index) != null;
+    }
+
+    private void ensureMismatchCapacity() {
+        while (mismatchActualByIndex.size() < notes.size()) {
+            mismatchActualByIndex.add(null);
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() != MotionEvent.ACTION_UP) {
+            return true;
+        }
+        if (mismatchNoteClickListener == null) {
+            return true;
+        }
+
+        float touchX = event.getX();
+        float touchY = event.getY();
+        for (NoteDrawInfo info : noteDrawInfos) {
+            if (!hasMismatch(info.index)) {
+                continue;
+            }
+            float dx = touchX - info.cx;
+            float dy = touchY - info.cy;
+            if (dx * dx + dy * dy <= info.hitRadius * info.hitRadius) {
+                String actual = mismatchActualByIndex.get(info.index);
+                NoteEvent expected = notes.get(info.index);
+                mismatchNoteClickListener.onMismatchNoteClick(info.index, expected.fullName(), actual);
+                return true;
+            }
+        }
+        return true;
+    }
+
+    public interface OnMismatchNoteClickListener {
+        void onMismatchNoteClick(int index, String expectedFullName, String actualFullName);
     }
 
     private static final class LabelLayout {
@@ -190,12 +283,14 @@ public class PitchOverlayView extends View {
         private final float x;
         private final float y;
         private final boolean active;
+        private final boolean mismatch;
 
-        private LabelLayout(String text, float x, float y, boolean active) {
+        private LabelLayout(String text, float x, float y, boolean active, boolean mismatch) {
             this.text = text;
             this.x = x;
             this.y = y;
             this.active = active;
+            this.mismatch = mismatch;
         }
     }
 
@@ -284,9 +379,29 @@ public class PitchOverlayView extends View {
         return max;
     }
 
-    private float yForMidi(int midi, float firstLineY, float lineGap) {
-        int refMidi = 64;
-        return firstLineY + lineGap * 4f - (midi - refMidi) * (lineGap / 2f);
+    private float yForMidiAdaptive(int midi, float minMidi, float maxMidi, float firstLineY, float lineGap) {
+        float noteTop = firstLineY - lineGap * 1.2f;
+        float noteBottom = firstLineY + lineGap * 4.2f;
+        if (maxMidi <= minMidi) {
+            return (noteTop + noteBottom) * 0.5f;
+        }
+        float ratio = (midi - minMidi) / (maxMidi - minMidi);
+        ratio = Math.max(0f, Math.min(1f, ratio));
+        return noteBottom - ratio * (noteBottom - noteTop);
+    }
+
+    private static final class NoteDrawInfo {
+        private final int index;
+        private final float cx;
+        private final float cy;
+        private final float hitRadius;
+
+        private NoteDrawInfo(int index, float cx, float cy, float hitRadius) {
+            this.index = index;
+            this.cx = cx;
+            this.cy = cy;
+            this.hitRadius = hitRadius;
+        }
     }
 
     private float yForFrequency(float hz, float top, float bottom) {
