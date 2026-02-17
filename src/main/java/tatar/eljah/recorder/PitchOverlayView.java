@@ -121,42 +121,21 @@ public class PitchOverlayView extends View {
         float h = getHeight();
 
         float availableHeight = Math.max(1f, h - STAFF_TOP_PADDING_PX - PANEL_BOTTOM_PADDING_PX);
-        int estimatedLabelRows = estimateLabelRows(w);
-        float noteLabelTextHeight = labelTextHeight();
-        float desiredLabelHeight = Math.max(LABEL_PANEL_MIN_HEIGHT_PX, requiredLabelPanelHeight(estimatedLabelRows, noteLabelTextHeight));
 
+        // Fixed heights for staff and spectrogram (independent from note count).
         float staffHeight = Math.max(STAFF_PANEL_MIN_HEIGHT_PX, availableHeight * 0.30f);
         float spectrogramHeight = Math.max(SPECTROGRAM_PANEL_MIN_HEIGHT_PX, availableHeight * 0.34f);
-        float gapBudget = NOTE_LABEL_BLOCK_GAP_PX + NOTE_LABEL_BLOCK_GAP_PX;
-        float totalNeeded = staffHeight + desiredLabelHeight + spectrogramHeight + gapBudget;
-
-        if (totalNeeded > availableHeight) {
-            float overflow = totalNeeded - availableHeight;
-            float staffShrink = Math.min(overflow * 0.45f, Math.max(0f, staffHeight - STAFF_PANEL_MIN_HEIGHT_PX));
-            staffHeight -= staffShrink;
-            overflow -= staffShrink;
-
-            float spectrogramShrink = Math.min(overflow * 0.65f, Math.max(0f, spectrogramHeight - SPECTROGRAM_PANEL_MIN_HEIGHT_PX));
-            spectrogramHeight -= spectrogramShrink;
-            overflow -= spectrogramShrink;
-
-            float labelMinForRows = Math.max(LABEL_PANEL_MIN_HEIGHT_PX, requiredLabelPanelHeight(estimatedLabelRows, noteLabelTextHeight));
-            float labelShrink = Math.min(Math.max(0f, overflow), Math.max(0f, desiredLabelHeight - labelMinForRows));
-            desiredLabelHeight -= labelShrink;
-        }
 
         float staffTop = STAFF_TOP_PADDING_PX;
         float staffBottom = staffTop + staffHeight;
-        float labelTop = staffBottom + NOTE_LABEL_BLOCK_GAP_PX;
-        float labelBottom = Math.min(h - PANEL_BOTTOM_PADDING_PX - spectrogramHeight - NOTE_LABEL_BLOCK_GAP_PX, labelTop + desiredLabelHeight);
-        if (labelBottom < labelTop + LABEL_PANEL_MIN_HEIGHT_PX) {
-            labelBottom = labelTop + LABEL_PANEL_MIN_HEIGHT_PX;
-        }
-        float spectrogramTop = labelBottom + NOTE_LABEL_BLOCK_GAP_PX;
+
         float spectrogramBottom = h - PANEL_BOTTOM_PADDING_PX;
-        if (spectrogramBottom - spectrogramTop < SPECTROGRAM_PANEL_MIN_HEIGHT_PX) {
-            spectrogramTop = Math.max(labelBottom, spectrogramBottom - SPECTROGRAM_PANEL_MIN_HEIGHT_PX);
-        }
+        float spectrogramTop = Math.max(staffBottom + NOTE_LABEL_BLOCK_GAP_PX,
+                spectrogramBottom - spectrogramHeight);
+
+        // Elastic middle panel: takes all remaining height between fixed panels.
+        float labelTop = staffBottom + NOTE_LABEL_BLOCK_GAP_PX;
+        float labelBottom = Math.max(labelTop, spectrogramTop - NOTE_LABEL_BLOCK_GAP_PX);
 
         drawStaffAndNotes(canvas, w, staffTop, staffBottom, labelTop, labelBottom);
         drawSpectrogram(canvas, w, spectrogramTop, spectrogramBottom);
@@ -226,7 +205,7 @@ public class PitchOverlayView extends View {
         float textHeight = labelTextHeight();
         float baselineStep = textHeight * 2f;
         float requiredHeight = requiredLabelPanelHeight(rowCount, textHeight);
-        float availableLabelHeight = Math.max(LABEL_PANEL_MIN_HEIGHT_PX, labelBottom - labelTop);
+        float availableLabelHeight = Math.max(1f, labelBottom - labelTop);
         float topInset = textHeight + Math.max(0f, (availableLabelHeight - requiredHeight) * 0.5f);
         Paint.FontMetrics fm = labelPaint.getFontMetrics();
         float baselineOffset = -fm.ascent;
