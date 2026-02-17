@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PitchOverlayView extends View {
-    private static final float MAX_SPECTROGRAM_HZ = 3000f;
+    private static final float MAX_SPECTROGRAM_HZ = 2000f;
     private static final float NOTE_LABEL_MIN_GAP_PX = 2f;
     private static final float STAFF_TOP_PADDING_PX = 28f;
     private static final float STAFF_BOTTOM_PADDING_PX = 12f;
@@ -440,7 +440,13 @@ public class PitchOverlayView extends View {
         }
     }
     private void drawSpectrogramGrid(Canvas canvas, float w, float top, float bottom) {
-        for (int i = 0; i <= 3; i++) { float hz = i * 1000f; float y = yForFrequency(hz, top, bottom); canvas.drawLine(0, y, w, y, spectrogramGridPaint); canvas.drawText(((int) hz) + " Hz", 8f, y - 4f, labelPaint); }
+        int gridLines = Math.max(1, (int) (MAX_SPECTROGRAM_HZ / 1000f));
+        for (int i = 0; i <= gridLines; i++) {
+            float hz = i * 1000f;
+            float y = yForFrequency(hz, top, bottom);
+            canvas.drawLine(0, y, w, y, spectrogramGridPaint);
+            canvas.drawText(((int) hz) + " Hz", 8f, y - 4f, labelPaint);
+        }
     }
     private void drawSpectrogramHeatmap(Canvas canvas, float w, float top, float bottom) {
         if (spectrumHistory.isEmpty()) return;
