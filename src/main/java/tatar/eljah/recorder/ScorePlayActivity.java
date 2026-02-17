@@ -8,6 +8,7 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -25,6 +26,8 @@ public class ScorePlayActivity extends AppCompatActivity {
     private static final int SYNTH_SAMPLE_RATE = 22050;
     private static final int SAFE_SAMPLE_RATE = 44100;
     private static final int ENVELOPE_FADE_MS = 8;
+    private static final long TABLATURE_MISMATCH_GRACE_MS = 120L;
+    private static final int TABLATURE_MISMATCH_CONFIRMATION_FRAMES = 2;
 
     private final PitchAnalyzer pitchAnalyzer = new PitchAnalyzer();
     private final RecorderNoteMapper mapper = new RecorderNoteMapper();
@@ -50,6 +53,9 @@ public class ScorePlayActivity extends AppCompatActivity {
 
     private volatile float currentInputIntensity;
     private float intensityThreshold;
+    private long pointerUpdatedAtMs;
+    private int consecutiveTablatureMismatchFrames;
+    private String lastTablatureMismatchPitch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +76,7 @@ public class ScorePlayActivity extends AppCompatActivity {
 
         ((TextView) findViewById(R.id.text_piece_title)).setText(piece.title);
         overlayView.setNotes(piece.notes);
-        overlayView.setPointer(-1);
+        setPointerWithTracking(-1);
         if (!piece.notes.isEmpty()) {
             NoteEvent firstExpected = piece.notes.get(pointer);
             overlayView.setFrequencies(expectedFrequencyFor(firstExpected), 0f);
@@ -206,15 +212,19 @@ public class ScorePlayActivity extends AppCompatActivity {
                 (int) normalizedHz));
 
         if (!samePitch(detected, expectedName)) {
+            if (shouldDeferTablatureMismatch(detected)) {
+                return;
+            }
             overlayView.markMismatch(pointer, detected);
             return;
         }
 
+        resetTablatureMismatchTracking();
         overlayView.clearMismatch(pointer);
         overlayView.markMatched(pointer, detected);
         pointer++;
         if (pointer < piece.notes.size()) {
-            overlayView.setPointer(pointer);
+            setPointerWithTracking(pointer);
             NoteEvent nextExpected = piece.notes.get(pointer);
             overlayView.setFrequencies(expectedFrequencyFor(nextExpected), 0f);
         } else {
@@ -223,6 +233,42 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
     }
 
+
+    private boolean shouldDeferTablatureMismatch(String detectedPitch) {
+        if (!tablaturePlaybackRequested) {
+            return false;
+        }
+
+        long elapsedSincePointerUpdate = SystemClock.elapsedRealtime() - pointerUpdatedAtMs;
+        if (elapsedSincePointerUpdate < TABLATURE_MISMATCH_GRACE_MS) {
+            return true;
+        }
+
+        if (detectedPitch == null) {
+            return true;
+        }
+
+        if (detectedPitch.equals(lastTablatureMismatchPitch)) {
+            consecutiveTablatureMismatchFrames++;
+        } else {
+            lastTablatureMismatchPitch = detectedPitch;
+            consecutiveTablatureMismatchFrames = 1;
+        }
+
+        return consecutiveTablatureMismatchFrames < TABLATURE_MISMATCH_CONFIRMATION_FRAMES;
+    }
+
+    private void resetTablatureMismatchTracking() {
+        consecutiveTablatureMismatchFrames = 0;
+        lastTablatureMismatchPitch = null;
+    }
+
+    private void setPointerWithTracking(int newPointer) {
+        pointer = newPointer;
+        pointerUpdatedAtMs = SystemClock.elapsedRealtime();
+        resetTablatureMismatchTracking();
+        overlayView.setPointer(newPointer);
+    }
 
     private void restartProgress() {
         stopMidiPlayback();
@@ -234,7 +280,7 @@ public class ScorePlayActivity extends AppCompatActivity {
                 overlayView.clearMatched(i);
             }
         }
-        overlayView.setPointer(-1);
+        setPointerWithTracking(-1);
         if (piece != null && !piece.notes.isEmpty()) {
             overlayView.setFrequencies(expectedFrequencyFor(piece.notes.get(0)), 0f);
         }
@@ -292,7 +338,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         midiFocusToken = focusToken;
         midiPlaybackRequested = true;
         pointer = 0;
-        overlayView.setPointer(pointer);
+        setPointerWithTracking(pointer);
         status.setText(R.string.play_midi_started);
         if (midiThread != null && midiThread.isAlive()) {
             return;
@@ -329,7 +375,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         tablatureFocusToken = focusToken;
         tablaturePlaybackRequested = true;
         pointer = 0;
-        overlayView.setPointer(pointer);
+        setPointerWithTracking(pointer);
         analyzeTablatureFrequencies();
         if (tablatureThread != null && tablatureThread.isAlive()) {
             return;
@@ -433,9 +479,11 @@ public class ScorePlayActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         if (!midiMode) {
+                            setPointerWithTracking(idx);
+                        } else {
                             pointer = idx;
+                            overlayView.setPointer(idx);
                         }
-                        overlayView.setPointer(idx);
                         status.setText(getString(midiMode ? R.string.play_midi_note : R.string.play_tablature_note,
                                 MusicNotation.toEuropeanLabel(note.noteName, note.octave)));
                     }
