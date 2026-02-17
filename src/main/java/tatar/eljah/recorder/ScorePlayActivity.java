@@ -28,6 +28,8 @@ public class ScorePlayActivity extends AppCompatActivity {
     private static final int ENVELOPE_FADE_MS = 8;
     private static final long TABLATURE_MISMATCH_GRACE_MS = 120L;
     private static final int TABLATURE_MISMATCH_CONFIRMATION_FRAMES = 2;
+    private static final int MIN_MATCH_HOLD_MS = 110;
+    private static final float MIN_MATCH_HOLD_DURATION_FRACTION = 0.45f;
 
     private final PitchAnalyzer pitchAnalyzer = new PitchAnalyzer();
     private final RecorderNoteMapper mapper = new RecorderNoteMapper();
@@ -56,6 +58,7 @@ public class ScorePlayActivity extends AppCompatActivity {
     private long pointerUpdatedAtMs;
     private int consecutiveTablatureMismatchFrames;
     private String lastTablatureMismatchPitch;
+    private long lastMatchAcceptedAtMs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -222,6 +225,9 @@ public class ScorePlayActivity extends AppCompatActivity {
         resetTablatureMismatchTracking();
         overlayView.clearMismatch(pointer);
         overlayView.markMatched(pointer, detected);
+        if (!canAdvanceToNextNote(expected)) {
+            return;
+        }
         pointer++;
         if (pointer < piece.notes.size()) {
             setPointerWithTracking(pointer);
@@ -233,6 +239,23 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
     }
 
+
+    private boolean canAdvanceToNextNote(NoteEvent note) {
+        long now = SystemClock.elapsedRealtime();
+        if (lastMatchAcceptedAtMs <= 0L) {
+            lastMatchAcceptedAtMs = now;
+            return true;
+        }
+
+        long minHoldMs = Math.max(MIN_MATCH_HOLD_MS,
+                (long) (durationMs(note.duration) * MIN_MATCH_HOLD_DURATION_FRACTION));
+        if (now - lastMatchAcceptedAtMs < minHoldMs) {
+            return false;
+        }
+
+        lastMatchAcceptedAtMs = now;
+        return true;
+    }
 
     private boolean shouldDeferTablatureMismatch(String detectedPitch) {
         if (!tablaturePlaybackRequested) {
@@ -263,12 +286,17 @@ public class ScorePlayActivity extends AppCompatActivity {
         lastTablatureMismatchPitch = null;
     }
 
+    private void resetMatchCadenceTracking() {
+        lastMatchAcceptedAtMs = 0L;
+    }
+
     private void setPointerWithTracking(int newPointer) {
         if (newPointer >= 0) {
             pointer = newPointer;
         }
         pointerUpdatedAtMs = SystemClock.elapsedRealtime();
         resetTablatureMismatchTracking();
+        resetMatchCadenceTracking();
         overlayView.setPointer(newPointer);
     }
 
