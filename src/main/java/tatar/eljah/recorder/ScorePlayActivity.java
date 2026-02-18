@@ -74,6 +74,7 @@ public class ScorePlayActivity extends AppCompatActivity {
     private int recoveryEvents;
     private int durationMatchCount;
     private int durationMeasuredCount;
+    private int userAdvancedNotesCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -276,6 +277,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
         updateDurationMismatchForPrevious(pointer);
         lastMatchAcceptedAtMs = SystemClock.elapsedRealtime();
+        userAdvancedNotesCount++;
         pointer++;
         if (pointer < piece.notes.size()) {
             setPointerWithTracking(pointer);
@@ -430,6 +432,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         recoveryEvents = 0;
         durationMatchCount = 0;
         durationMeasuredCount = 0;
+        userAdvancedNotesCount = 0;
     }
 
     private void registerNoteAttempt() {
@@ -460,6 +463,9 @@ public class ScorePlayActivity extends AppCompatActivity {
         if (piece == null || piece.id == null) {
             return;
         }
+        if (userAdvancedNotesCount < piece.notes.size()) {
+            return;
+        }
 
         int totalAttempts = attemptHitCount + attemptMissCount;
         float hitRatio = totalAttempts > 0 ? (attemptHitCount / (float) totalAttempts) : 0f;
@@ -472,7 +478,7 @@ public class ScorePlayActivity extends AppCompatActivity {
         }
         float durationRatio = durationMeasuredCount > 0
                 ? durationMatchCount / (float) durationMeasuredCount
-                : 0f;
+                : 1f;
 
         PerformanceMetricsStore.PerformanceAttempt attempt = new PerformanceMetricsStore.PerformanceAttempt();
         attempt.hitRatio = hitRatio;
