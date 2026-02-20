@@ -86,11 +86,11 @@ public class ShuvyrGameView extends View {
     }
 
     private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
-        float cx = pipe.centerX() + pipe.width() * 0.12f;
+        float cx = pipe.centerX();
         float radius = pipe.width() * 0.15f;
         float touchRadius = radius * 2.0f;
         float startY = pipe.top + pipe.height() * 0.16f;
-        float step = pipe.height() * 0.22f;
+        float step = pipe.height() * 0.18f;
 
         for (int i = 0; i < LONG_PIPE_HOLES; i++) {
             float cy = startY + i * step;
@@ -99,13 +99,15 @@ public class ShuvyrGameView extends View {
     }
 
     private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
-        float cx = pipe.centerX() - pipe.width() * 0.12f;
+        float cx = pipe.centerX();
         float radius = pipe.width() * 0.15f;
         float touchRadius = radius * 2.0f;
 
-        // Короткий ряд из 2 дырок на второй трубке с большим интервалом.
-        float y1 = pipe.top + pipe.height() * 0.82f;
-        float y2 = pipe.top + pipe.height() * 0.94f;
+        float startY = pipe.top + pipe.height() * 0.16f;
+        float step = pipe.height() * 0.18f;
+        // Те же интервалы между дырками, что и на длинной трубке.
+        float y1 = startY + step * 3f;
+        float y2 = y1 + step;
 
         drawHole(canvas, cx, y1, radius, touchRadius, offset);
         drawHole(canvas, cx, y2, radius, touchRadius, offset + 1);
