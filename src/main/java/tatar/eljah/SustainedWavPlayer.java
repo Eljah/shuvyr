@@ -5,6 +5,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.media.MediaPlayer;
 import android.os.Build;
 
 import java.io.ByteArrayOutputStream;
@@ -13,12 +14,21 @@ import java.io.InputStream;
 
 public class SustainedWavPlayer {
     private static final float ATTACK_SKIP_SECONDS = 0.12f;
+    private static final int ATTACK_SKIP_MS = (int) (ATTACK_SKIP_SECONDS * 1000f);
 
-    private final AudioTrack track;
-    private final int loopStartFrame;
-    private final int endFrame;
+    private AudioTrack track;
+    private MediaPlayer mediaPlayer;
+    private int loopStartFrame;
 
     public SustainedWavPlayer(Context context, int rawResId) {
+        try {
+            initAudioTrack(context, rawResId);
+        } catch (RuntimeException unsupportedWav) {
+            initMediaPlayerFallback(context, rawResId);
+        }
+    }
+
+    private void initAudioTrack(Context context, int rawResId) {
         byte[] wavData = readAll(context, rawResId);
         WavInfo info = parseWav(wavData);
 
@@ -46,40 +56,87 @@ public class SustainedWavPlayer {
         int bytesPerFrame = info.channelCount * (info.bitsPerSample / 8);
         int totalFrames = Math.max(1, written / bytesPerFrame);
 
-        endFrame = totalFrames;
         int desiredLoopStart = (int) (info.sampleRate * ATTACK_SKIP_SECONDS);
-        loopStartFrame = Math.max(0, Math.min(desiredLoopStart, Math.max(0, endFrame - 1)));
-        track.setLoopPoints(loopStartFrame, endFrame, -1);
+        loopStartFrame = Math.max(0, Math.min(desiredLoopStart, Math.max(0, totalFrames - 1)));
+        track.setLoopPoints(loopStartFrame, totalFrames, -1);
+    }
+
+    private void initMediaPlayerFallback(Context context, int rawResId) {
+        mediaPlayer = MediaPlayer.create(context, rawResId);
+        if (mediaPlayer == null) {
+            throw new IllegalStateException("Unable to initialize fallback MediaPlayer");
+        }
+        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                try {
+                    mp.seekTo(ATTACK_SKIP_MS);
+                    mp.start();
+                } catch (IllegalStateException ignored) {
+                }
+            }
+        });
     }
 
     public void playSustain() {
-        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+        if (track != null) {
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                return;
+            }
+            try {
+                track.pause();
+                track.flush();
+            } catch (IllegalStateException ignored) {
+            }
+            track.reloadStaticData();
+            track.setPlaybackHeadPosition(loopStartFrame);
+            track.play();
             return;
         }
-        try {
-            track.pause();
-            track.flush();
-        } catch (IllegalStateException ignored) {
+
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.pause();
+            } catch (IllegalStateException ignored) {
+            }
+            try {
+                mediaPlayer.seekTo(ATTACK_SKIP_MS);
+                mediaPlayer.start();
+            } catch (IllegalStateException ignored) {
+            }
         }
-        track.reloadStaticData();
-        track.setPlaybackHeadPosition(loopStartFrame);
-        track.play();
     }
 
     public void stop() {
-        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
-            return;
+        if (track != null) {
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                return;
+            }
+            try {
+                track.pause();
+                track.flush();
+            } catch (IllegalStateException ignored) {
+            }
         }
-        try {
-            track.pause();
-            track.flush();
-        } catch (IllegalStateException ignored) {
+
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.pause();
+            } catch (IllegalStateException ignored) {
+            }
         }
     }
 
     public void release() {
         stop();
-        track.release();
+        if (track != null) {
+            track.release();
+            track = null;
+        }
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
     }
 
     private static byte[] readAll(Context context, int rawResId) {
