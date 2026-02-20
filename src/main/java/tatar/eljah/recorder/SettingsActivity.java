@@ -8,7 +8,7 @@ import android.widget.Button;
 import android.widget.Spinner;
 
 import tatar.eljah.MainActivity;
-import tatar.eljah.fluitblox.R;
+import tatar.eljah.shuvyr.R;
 
 public class SettingsActivity extends AppCompatActivity {
 

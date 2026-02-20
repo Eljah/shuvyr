@@ -3,9 +3,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KEYSTORE_PATH="$REPO_ROOT/keystore/release-key.jks"
-KEY_ALIAS="${KEY_ALIAS:-release}"
-KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD:-Tatarstan1920}"
-KEY_PASSWORD="${KEY_PASSWORD:-Tatarstan1920}"
+KEY_ALIAS="${KEY_ALIAS:-shuvyr_release}"
+KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD:-Shuvyr2026!}"
+KEY_PASSWORD="${KEY_PASSWORD:-Shuvyr2026!}"
 
 BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-34.0.0}"
 

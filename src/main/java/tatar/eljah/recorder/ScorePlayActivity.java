@@ -21,7 +21,7 @@ import android.widget.TextView;
 
 import tatar.eljah.audio.AudioSettingsStore;
 import tatar.eljah.audio.PitchAnalyzer;
-import tatar.eljah.fluitblox.R;
+import tatar.eljah.shuvyr.R;
 
 public class ScorePlayActivity extends AppCompatActivity {
     public static final String EXTRA_PIECE_ID = "piece_id";

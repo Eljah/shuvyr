@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import tatar.eljah.fluitblox.R;
+import tatar.eljah.shuvyr.R;
 
 public class AchievementsActivity extends AppCompatActivity {
     private static final float PERFECT_RATIO = 0.999f;
