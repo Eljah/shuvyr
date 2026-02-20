@@ -121,19 +121,30 @@ public class ShuvyrGameView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
-        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
+        if (action != MotionEvent.ACTION_DOWN
+            && action != MotionEvent.ACTION_MOVE
+            && action != MotionEvent.ACTION_UP
+            && action != MotionEvent.ACTION_POINTER_DOWN
+            && action != MotionEvent.ACTION_POINTER_UP
+            && action != MotionEvent.ACTION_CANCEL) {
             return super.onTouchEvent(event);
         }
 
         boolean changed = false;
         boolean[] nextState = new boolean[closed.length];
 
-        for (int i = 0; i < event.getPointerCount(); i++) {
-            float x = event.getX(i);
-            float y = event.getY(i);
-            for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
-                if (holeAreas.get(holeIndex).contains(x, y)) {
-                    nextState[holeIndex] = true;
+        if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
+            int skipPointer = action == MotionEvent.ACTION_POINTER_UP ? event.getActionIndex() : -1;
+            for (int i = 0; i < event.getPointerCount(); i++) {
+                if (i == skipPointer) {
+                    continue;
+                }
+                float x = event.getX(i);
+                float y = event.getY(i);
+                for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
+                    if (holeAreas.get(holeIndex).contains(x, y)) {
+                        nextState[holeIndex] = true;
+                    }
                 }
             }
         }

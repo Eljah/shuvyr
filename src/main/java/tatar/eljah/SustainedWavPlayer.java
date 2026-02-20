@@ -75,6 +75,21 @@ public class SustainedWavPlayer {
         }
     }
 
+
+    public void hardStop() {
+        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            return;
+        }
+        try {
+            track.pause();
+            track.flush();
+            track.reloadStaticData();
+            track.setPlaybackHeadPosition(0);
+            track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
     public void release() {
         if (track.getState() == AudioTrack.STATE_INITIALIZED) {
             try {

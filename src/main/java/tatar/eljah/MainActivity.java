@@ -12,6 +12,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
     private final SustainedWavPlayer[] players = new SustainedWavPlayer[SOUND_COUNT];
     private int activeSoundNumber = -1;
+    private int releasingSoundNumber = -1;
 
     private TextView noteLabel;
 
@@ -52,7 +53,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             return;
         }
 
-        stopActiveWithRelease();
+        stopPreviousReleaseIfAny();
+        moveActiveToRelease();
 
         if (soundNumber == SILENT) {
             activeSoundNumber = SILENT;
@@ -111,12 +113,21 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         return Math.min(SOUND_COUNT, 4 + shortClosed);
     }
 
-    private void stopActiveWithRelease() {
+    private void moveActiveToRelease() {
         if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
             return;
         }
         SustainedWavPlayer active = players[activeSoundNumber - 1];
         active.stopWithRelease();
+        releasingSoundNumber = activeSoundNumber;
+    }
+
+    private void stopPreviousReleaseIfAny() {
+        if (releasingSoundNumber < 1 || releasingSoundNumber > SOUND_COUNT) {
+            return;
+        }
+        players[releasingSoundNumber - 1].hardStop();
+        releasingSoundNumber = -1;
     }
 
     @Override
