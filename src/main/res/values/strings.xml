@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">Fluiteblox</string>
-    <string name="main_title">Fluiteblox</string>
-    <string name="main_capture">1) Сфотографировать ноты</string>
-    <string name="main_library">2) Библиотека произведений</string>
-    <string name="main_settings">3) Настройки</string>
-    <string name="main_achievements">4) Достижения и прогресс</string>
+    <string name="app_name">Шÿвыр</string>
+    <string name="main_title">Шÿвыр — марийская волынка</string>
+    <string name="main_capture">Игра</string>
+    <string name="main_library">Библиотека</string>
+    <string name="main_settings">Настройки</string>
+    <string name="main_achievements">Прогресс</string>
 
     <string name="settings_title">Настройки распознавания</string>
     <string name="settings_threshold_value_default">Порог интенсивности: 0.030</string>
@@ -74,7 +74,7 @@
     <string name="play_restart">Начать заново</string>
     <string name="play_restarted">Прогресс сброшен. Начинайте с первой ноты.</string>
     <string name="play_simplified_mode">Упрощенный режим (#/b = та же нота)</string>
-    <string name="play_header_with_fingering">Fluiteblox — %1$s</string>
+    <string name="play_header_with_fingering">Shuvyr — %1$s</string>
 
 
     <string name="achievements_title">Достижения по произведениям</string>
@@ -101,4 +101,7 @@
     <string name="hint_duration_eighth">восьмая</string>
     <string name="hint_duration_sixteenth">шестнадцатая</string>
     <string name="hint_duration_unknown">неизвестно</string>
+    <string name="main_hint">Зажимайте дырочки на двух трубках для извлечения звука.</string>
+    <string name="current_note_placeholder">Текущая нота: —</string>
+    <string name="current_note_template">Текущая нота: %1$s · закрыто отверстий: %2$d</string>
 </resources>

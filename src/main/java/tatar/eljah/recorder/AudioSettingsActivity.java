@@ -9,7 +9,7 @@ import android.widget.TextView;
 
 import tatar.eljah.audio.AudioSettingsStore;
 import tatar.eljah.audio.PitchAnalyzer;
-import tatar.eljah.fluitblox.R;
+import tatar.eljah.shuvyr.R;
 
 public class AudioSettingsActivity extends AppCompatActivity {
     private final PitchAnalyzer analyzer = new PitchAnalyzer();
