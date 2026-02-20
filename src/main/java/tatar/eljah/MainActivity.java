@@ -34,12 +34,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         initFingeringMap();
 
         soundPool = createSoundPool();
-        sampleIds[0] = soundPool.load(this, R.raw.shuvyr_1, 1);
-        sampleIds[1] = soundPool.load(this, R.raw.shuvyr_2, 1);
-        sampleIds[2] = soundPool.load(this, R.raw.shuvyr_3, 1);
-        sampleIds[3] = soundPool.load(this, R.raw.shuvyr_4, 1);
-        sampleIds[4] = soundPool.load(this, R.raw.shuvyr_5, 1);
-        sampleIds[5] = soundPool.load(this, R.raw.shuvyr_6, 1);
         soundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
             @Override
             public void onLoadComplete(SoundPool pool, int sampleId, int status) {
@@ -48,6 +42,12 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                 }
             }
         });
+        sampleIds[0] = soundPool.load(this, R.raw.shuvyr_1, 1);
+        sampleIds[1] = soundPool.load(this, R.raw.shuvyr_2, 1);
+        sampleIds[2] = soundPool.load(this, R.raw.shuvyr_3, 1);
+        sampleIds[3] = soundPool.load(this, R.raw.shuvyr_4, 1);
+        sampleIds[4] = soundPool.load(this, R.raw.shuvyr_5, 1);
+        sampleIds[5] = soundPool.load(this, R.raw.shuvyr_6, 1);
     }
 
     @Override
