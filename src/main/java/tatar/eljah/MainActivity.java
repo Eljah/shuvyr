@@ -8,6 +8,7 @@ import tatar.eljah.shuvyr.R;
 
 public class MainActivity extends AppCompatActivity implements ShuvyrGameView.OnFingeringChangeListener {
     private static final int SOUND_COUNT = 6;
+    private static final int SILENT = 0;
 
     private final SustainedWavPlayer[] players = new SustainedWavPlayer[SOUND_COUNT];
     private int activeSoundNumber = -1;
@@ -44,13 +45,19 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
         int soundNumber = mapPatternToSoundNumber(pattern);
-        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
+        String labelValue = soundNumber == SILENT ? "—" : String.valueOf(soundNumber);
+        noteLabel.setText(getString(R.string.current_note_template, labelValue, closedCount));
 
         if (soundNumber == activeSoundNumber) {
             return;
         }
 
         stopActiveWithRelease();
+
+        if (soundNumber == SILENT) {
+            activeSoundNumber = SILENT;
+            return;
+        }
 
         SustainedWavPlayer next = players[soundNumber - 1];
         next.playSustain();
@@ -60,27 +67,44 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private int mapPatternToSoundNumber(int pattern) {
         // Эффективное зажатие: только непрерывно от первой дырки на каждой трубке.
         // Индексы: long L1..L4 => bits 0..3, short R1..R2 => bits 4..5.
+        // Если на трубке есть "дырка после разрыва" (например только 2-я), это невалидно => тишина.
+        int longMask = pattern & 0b001111;
+        int shortMask = (pattern >> 4) & 0b000011;
+
         int longClosed = 0;
         for (int i = 0; i < 4; i++) {
-            if ((pattern & (1 << i)) != 0) {
+            if ((longMask & (1 << i)) != 0) {
                 longClosed++;
             } else {
                 break;
             }
         }
 
-        if (longClosed < 4) {
-            // 1ст..4ст
-            return longClosed + 1;
+        int longExpectedMask = longClosed == 0 ? 0 : ((1 << longClosed) - 1);
+        if (longMask != longExpectedMask) {
+            return SILENT;
         }
 
         int shortClosed = 0;
-        for (int i = 4; i < 6; i++) {
-            if ((pattern & (1 << i)) != 0) {
+        for (int i = 0; i < 2; i++) {
+            if ((shortMask & (1 << i)) != 0) {
                 shortClosed++;
             } else {
                 break;
             }
+        }
+
+        int shortExpectedMask = shortClosed == 0 ? 0 : ((1 << shortClosed) - 1);
+        if (shortMask != shortExpectedMask) {
+            return SILENT;
+        }
+
+        if (longClosed < 4) {
+            if (shortClosed > 0) {
+                return SILENT;
+            }
+            // 1ст..4ст
+            return longClosed + 1;
         }
 
         // 5ст: 4 длинные + 1 короткая, 6ст: все дырки.
