@@ -17,9 +17,9 @@ public class ShuvyrGameView extends View {
         void onFingeringChanged(int closedCount, int pattern);
     }
 
-    private static final int PIPE_COUNT = 2;
-    private static final int HOLES_PER_PIPE = 3;
-    private static final int HOLE_COUNT = PIPE_COUNT * HOLES_PER_PIPE;
+    private static final int LONG_PIPE_HOLES = 5;
+    private static final int SHORT_PIPE_HOLES = 2;
+    private static final int HOLE_COUNT = LONG_PIPE_HOLES + SHORT_PIPE_HOLES;
 
     private final Paint pipePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -65,39 +65,57 @@ public class ShuvyrGameView extends View {
 
         float w = getWidth();
         float h = getHeight();
-        float pipeWidth = w * 0.22f;
-        float pipeHeight = h * 0.84f;
-        float top = h * 0.08f;
-        float leftPipeLeft = w * 0.15f;
-        float rightPipeLeft = w - leftPipeLeft - pipeWidth;
+        float pipeWidth = w * 0.24f;
+        float pipeHeight = h * 0.80f;
+        float top = h * 0.10f;
 
-        RectF leftPipe = new RectF(leftPipeLeft, top, leftPipeLeft + pipeWidth, top + pipeHeight);
-        RectF rightPipe = new RectF(rightPipeLeft, top, rightPipeLeft + pipeWidth, top + pipeHeight);
+        float leftPipeLeft = w * 0.17f;
+        float rightPipeLeft = w * 0.59f;
 
-        canvas.drawRoundRect(leftPipe, 36f, 36f, pipePaint);
-        canvas.drawRoundRect(leftPipe, 36f, 36f, borderPaint);
-        canvas.drawRoundRect(rightPipe, 36f, 36f, pipePaint);
-        canvas.drawRoundRect(rightPipe, 36f, 36f, borderPaint);
+        RectF longPipe = new RectF(leftPipeLeft, top, leftPipeLeft + pipeWidth, top + pipeHeight);
+        RectF shortPipe = new RectF(rightPipeLeft, top, rightPipeLeft + pipeWidth, top + pipeHeight);
+
+        canvas.drawRoundRect(longPipe, 36f, 36f, pipePaint);
+        canvas.drawRoundRect(longPipe, 36f, 36f, borderPaint);
+        canvas.drawRoundRect(shortPipe, 36f, 36f, pipePaint);
+        canvas.drawRoundRect(shortPipe, 36f, 36f, borderPaint);
 
         holeAreas.clear();
-        drawPipeHoles(canvas, leftPipe, 0);
-        drawPipeHoles(canvas, rightPipe, HOLES_PER_PIPE);
+        drawLongPipeHoles(canvas, longPipe, 0);
+        drawShortPipeHoles(canvas, shortPipe, LONG_PIPE_HOLES);
     }
 
-    private void drawPipeHoles(Canvas canvas, RectF pipe, int indexOffset) {
+    private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
         float radius = pipe.width() * 0.15f;
-        float touchRadius = radius * 1.55f;
-        float[] yFactors = new float[] {0.16f, 0.50f, 0.84f};
+        float touchRadius = radius * 1.5f;
+        float startY = pipe.top + pipe.height() * 0.10f;
+        float step = pipe.height() * 0.18f;
 
-        for (int i = 0; i < HOLES_PER_PIPE; i++) {
-            float cy = pipe.top + pipe.height() * yFactors[i];
-            RectF holeArea = new RectF(cx - touchRadius, cy - touchRadius, cx + touchRadius, cy + touchRadius);
-            holeAreas.add(holeArea);
-            int holeIndex = indexOffset + i;
-            canvas.drawCircle(cx, cy, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
-            canvas.drawCircle(cx, cy, radius, borderPaint);
+        for (int i = 0; i < LONG_PIPE_HOLES; i++) {
+            float cy = startY + i * step;
+            drawHole(canvas, cx, cy, radius, touchRadius, offset + i);
         }
+    }
+
+    private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
+        float cx = pipe.centerX();
+        float radius = pipe.width() * 0.15f;
+        float touchRadius = radius * 1.6f;
+
+        // Короткий ряд из 2 дырок на второй трубке с большим интервалом.
+        float y1 = pipe.top + pipe.height() * 0.40f;
+        float y2 = pipe.top + pipe.height() * 0.70f;
+
+        drawHole(canvas, cx, y1, radius, touchRadius, offset);
+        drawHole(canvas, cx, y2, radius, touchRadius, offset + 1);
+    }
+
+    private void drawHole(Canvas canvas, float x, float y, float radius, float touchRadius, int holeIndex) {
+        RectF holeArea = new RectF(x - touchRadius, y - touchRadius, x + touchRadius, y + touchRadius);
+        holeAreas.add(holeArea);
+        canvas.drawCircle(x, y, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
+        canvas.drawCircle(x, y, radius, borderPaint);
     }
 
     @Override

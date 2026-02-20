@@ -5,7 +5,6 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
-import android.media.MediaPlayer;
 import android.os.Build;
 
 import java.io.ByteArrayOutputStream;
@@ -14,30 +13,18 @@ import java.io.InputStream;
 
 public class SustainedWavPlayer {
     private static final float ATTACK_SKIP_SECONDS = 0.12f;
-    private static final int ATTACK_SKIP_MS = (int) (ATTACK_SKIP_SECONDS * 1000f);
 
-    private AudioTrack track;
-    private MediaPlayer mediaPlayer;
-    private int loopStartFrame;
+    private final AudioTrack track;
+    private final int loopStartFrame;
 
     public SustainedWavPlayer(Context context, int rawResId) {
-        try {
-            initAudioTrack(context, rawResId);
-        } catch (RuntimeException unsupportedWav) {
-            initMediaPlayerFallback(context, rawResId);
-        }
-    }
-
-    private void initAudioTrack(Context context, int rawResId) {
         byte[] wavData = readAll(context, rawResId);
-        WavInfo info = parseWav(wavData);
+        PcmData pcm = decodeToPcm16(wavData);
 
         AudioFormat format = new AudioFormat.Builder()
             .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-            .setSampleRate(info.sampleRate)
-            .setChannelMask(info.channelCount == 2
-                ? AudioFormat.CHANNEL_OUT_STEREO
-                : AudioFormat.CHANNEL_OUT_MONO)
+            .setSampleRate(pcm.sampleRate)
+            .setChannelMask(pcm.channelCount == 2 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO)
             .build();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -45,98 +32,86 @@ public class SustainedWavPlayer {
                 .setUsage(AudioAttributes.USAGE_GAME)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build();
-            track = new AudioTrack(attrs, format, info.dataSize, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
+            track = new AudioTrack(attrs, format, pcm.pcm16.length, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
         } else {
-            int channelConfig = info.channelCount == 2 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
-            track = new AudioTrack(AudioManager.STREAM_MUSIC, info.sampleRate, channelConfig,
-                AudioFormat.ENCODING_PCM_16BIT, info.dataSize, AudioTrack.MODE_STATIC);
+            int channelConfig = pcm.channelCount == 2 ? AudioFormat.CHANNEL_OUT_STEREO : AudioFormat.CHANNEL_OUT_MONO;
+            track = new AudioTrack(AudioManager.STREAM_MUSIC, pcm.sampleRate, channelConfig,
+                AudioFormat.ENCODING_PCM_16BIT, pcm.pcm16.length, AudioTrack.MODE_STATIC);
         }
 
-        int written = track.write(wavData, info.dataOffset, info.dataSize);
-        int bytesPerFrame = info.channelCount * (info.bitsPerSample / 8);
+        int written = track.write(pcm.pcm16, 0, pcm.pcm16.length);
+        int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
-
-        int desiredLoopStart = (int) (info.sampleRate * ATTACK_SKIP_SECONDS);
+        int desiredLoopStart = (int) (pcm.sampleRate * ATTACK_SKIP_SECONDS);
         loopStartFrame = Math.max(0, Math.min(desiredLoopStart, Math.max(0, totalFrames - 1)));
         track.setLoopPoints(loopStartFrame, totalFrames, -1);
     }
 
-    private void initMediaPlayerFallback(Context context, int rawResId) {
-        mediaPlayer = MediaPlayer.create(context, rawResId);
-        if (mediaPlayer == null) {
-            throw new IllegalStateException("Unable to initialize fallback MediaPlayer");
-        }
-        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-            @Override
-            public void onCompletion(MediaPlayer mp) {
-                try {
-                    mp.seekTo(ATTACK_SKIP_MS);
-                    mp.start();
-                } catch (IllegalStateException ignored) {
-                }
-            }
-        });
-    }
-
     public void playSustain() {
-        if (track != null) {
-            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
-                return;
-            }
-            try {
-                track.pause();
-                track.flush();
-            } catch (IllegalStateException ignored) {
-            }
-            track.reloadStaticData();
-            track.setPlaybackHeadPosition(loopStartFrame);
-            track.play();
+        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
             return;
         }
-
-        if (mediaPlayer != null) {
-            try {
-                mediaPlayer.pause();
-            } catch (IllegalStateException ignored) {
-            }
-            try {
-                mediaPlayer.seekTo(ATTACK_SKIP_MS);
-                mediaPlayer.start();
-            } catch (IllegalStateException ignored) {
-            }
+        try {
+            track.pause();
+            track.flush();
+        } catch (IllegalStateException ignored) {
         }
+        track.reloadStaticData();
+        track.setPlaybackHeadPosition(loopStartFrame);
+        track.play();
     }
 
     public void stop() {
-        if (track != null) {
-            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
-                return;
-            }
-            try {
-                track.pause();
-                track.flush();
-            } catch (IllegalStateException ignored) {
-            }
+        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            return;
         }
-
-        if (mediaPlayer != null) {
-            try {
-                mediaPlayer.pause();
-            } catch (IllegalStateException ignored) {
-            }
+        try {
+            track.pause();
+            track.flush();
+        } catch (IllegalStateException ignored) {
         }
     }
 
     public void release() {
         stop();
-        if (track != null) {
-            track.release();
-            track = null;
+        track.release();
+    }
+
+    private static PcmData decodeToPcm16(byte[] wavBytes) {
+        WavInfo info = parseWav(wavBytes);
+
+        if (info.audioFormat == 1 && info.bitsPerSample == 16) {
+            byte[] pcm = new byte[info.dataSize];
+            System.arraycopy(wavBytes, info.dataOffset, pcm, 0, info.dataSize);
+            return new PcmData(info.sampleRate, info.channelCount, pcm);
         }
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-            mediaPlayer = null;
+
+        if (info.audioFormat == 3 && info.bitsPerSample == 32) {
+            int sampleCount = info.dataSize / 4;
+            byte[] pcm = new byte[sampleCount * 2];
+            int in = info.dataOffset;
+            int out = 0;
+            for (int i = 0; i < sampleCount; i++) {
+                int bits = littleEndianInt(wavBytes, in);
+                float f = Float.intBitsToFloat(bits);
+                if (Float.isNaN(f)) {
+                    f = 0f;
+                }
+                if (f > 1f) {
+                    f = 1f;
+                } else if (f < -1f) {
+                    f = -1f;
+                }
+                short s = (short) Math.round(f * 32767f);
+                pcm[out] = (byte) (s & 0xFF);
+                pcm[out + 1] = (byte) ((s >> 8) & 0xFF);
+                in += 4;
+                out += 2;
+            }
+            return new PcmData(info.sampleRate, info.channelCount, pcm);
         }
+
+        throw new IllegalStateException("Unsupported WAV format: format=" + info.audioFormat + ", bps=" + info.bitsPerSample);
     }
 
     private static byte[] readAll(Context context, int rawResId) {
@@ -175,11 +150,10 @@ public class SustainedWavPlayer {
 
         while (cursor + 8 <= bytes.length) {
             int chunkSize = littleEndianInt(bytes, cursor + 4);
-            String id = new String(bytes, cursor, 4);
             int payloadOffset = cursor + 8;
-            if ("fmt ".equals(id)) {
+            if (isTag(bytes, cursor, "fmt ")) {
                 fmtOffset = payloadOffset;
-            } else if ("data".equals(id)) {
+            } else if (isTag(bytes, cursor, "data")) {
                 dataOffset = payloadOffset;
                 dataSize = chunkSize;
                 break;
@@ -191,20 +165,21 @@ public class SustainedWavPlayer {
             throw new IllegalStateException("Unsupported WAV structure");
         }
 
-        int format = littleEndianShort(bytes, fmtOffset);
+        int audioFormat = littleEndianShort(bytes, fmtOffset);
         int channels = littleEndianShort(bytes, fmtOffset + 2);
         int sampleRate = littleEndianInt(bytes, fmtOffset + 4);
         int bitsPerSample = littleEndianShort(bytes, fmtOffset + 14);
 
-        if (format != 1 || (channels != 1 && channels != 2) || bitsPerSample != 16) {
-            throw new IllegalStateException("Only PCM16 mono/stereo WAV is supported");
+        if (channels != 1 && channels != 2) {
+            throw new IllegalStateException("Only mono/stereo WAV is supported");
         }
 
-        return new WavInfo(sampleRate, channels, bitsPerSample, dataOffset, dataSize);
+        return new WavInfo(audioFormat, sampleRate, channels, bitsPerSample, dataOffset, dataSize);
     }
 
     private static boolean isTag(byte[] bytes, int offset, String tag) {
-        return bytes[offset] == tag.charAt(0)
+        return offset + 3 < bytes.length
+            && bytes[offset] == tag.charAt(0)
             && bytes[offset + 1] == tag.charAt(1)
             && bytes[offset + 2] == tag.charAt(2)
             && bytes[offset + 3] == tag.charAt(3);
@@ -222,18 +197,32 @@ public class SustainedWavPlayer {
     }
 
     private static final class WavInfo {
+        final int audioFormat;
         final int sampleRate;
         final int channelCount;
         final int bitsPerSample;
         final int dataOffset;
         final int dataSize;
 
-        WavInfo(int sampleRate, int channelCount, int bitsPerSample, int dataOffset, int dataSize) {
+        WavInfo(int audioFormat, int sampleRate, int channelCount, int bitsPerSample, int dataOffset, int dataSize) {
+            this.audioFormat = audioFormat;
             this.sampleRate = sampleRate;
             this.channelCount = channelCount;
             this.bitsPerSample = bitsPerSample;
             this.dataOffset = dataOffset;
             this.dataSize = dataSize;
+        }
+    }
+
+    private static final class PcmData {
+        final int sampleRate;
+        final int channelCount;
+        final byte[] pcm16;
+
+        PcmData(int sampleRate, int channelCount, byte[] pcm16) {
+            this.sampleRate = sampleRate;
+            this.channelCount = channelCount;
+            this.pcm16 = pcm16;
         }
     }
 }

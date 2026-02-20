@@ -7,7 +7,9 @@ import android.widget.TextView;
 import tatar.eljah.shuvyr.R;
 
 public class MainActivity extends AppCompatActivity implements ShuvyrGameView.OnFingeringChangeListener {
-    private final SustainedWavPlayer[] players = new SustainedWavPlayer[6];
+    private static final int SOUND_COUNT = 6;
+
+    private final SustainedWavPlayer[] players = new SustainedWavPlayer[SOUND_COUNT];
     private int activeSoundNumber = -1;
 
     private TextView noteLabel;
@@ -31,7 +33,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         };
 
         for (int i = 0; i < resources.length; i++) {
-            players[i] = new SustainedWavPlayer(this, resources[i]);
+            try {
+                players[i] = new SustainedWavPlayer(this, resources[i]);
+            } catch (RuntimeException e) {
+                players[i] = null;
+            }
         }
     }
 
@@ -45,28 +51,37 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
 
         stopActive();
-        players[soundNumber - 1].playSustain();
-        activeSoundNumber = soundNumber;
+
+        SustainedWavPlayer next = players[soundNumber - 1];
+        if (next != null) {
+            next.playSustain();
+            activeSoundNumber = soundNumber;
+        } else {
+            activeSoundNumber = -1;
+        }
     }
 
     private int mapPatternToSoundNumber(int pattern) {
-        // Порядок дырок для «закрыть все до этой»: L1, L2, L3, R1, R2, R3.
+        // Порядок дырок: L1..L5, R1..R2. Следующий звук только при закрытии всех предыдущих.
         int leadingClosed = 0;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 7; i++) {
             if ((pattern & (1 << i)) != 0) {
                 leadingClosed++;
             } else {
                 break;
             }
         }
-        return Math.min(6, leadingClosed + 1);
+        return Math.min(SOUND_COUNT, leadingClosed + 1);
     }
 
     private void stopActive() {
-        if (activeSoundNumber < 1 || activeSoundNumber > 6) {
+        if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
             return;
         }
-        players[activeSoundNumber - 1].stop();
+        SustainedWavPlayer active = players[activeSoundNumber - 1];
+        if (active != null) {
+            active.stop();
+        }
     }
 
     @Override
