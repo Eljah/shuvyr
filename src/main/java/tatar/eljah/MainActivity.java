@@ -1,26 +1,16 @@
 package tatar.eljah;
 
-import android.media.AudioAttributes;
-import android.media.SoundPool;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.TextView;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import tatar.eljah.shuvyr.R;
 
 public class MainActivity extends AppCompatActivity implements ShuvyrGameView.OnFingeringChangeListener {
-    private SoundPool soundPool;
-    private final int[] sampleIds = new int[6];
-    private int loadedSamples;
-
-    private int activeStreamId;
+    private final SustainedWavPlayer[] players = new SustainedWavPlayer[6];
+    private int activeSoundNumber = -1;
 
     private TextView noteLabel;
-    private final Map<Integer, Integer> fingeringToSample = new HashMap<Integer, Integer>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,78 +21,61 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         ShuvyrGameView gameView = findViewById(R.id.shuvyr_view);
         gameView.setOnFingeringChangeListener(this);
 
-        initFingeringMap();
+        int[] resources = new int[] {
+            R.raw.shuvyr_1,
+            R.raw.shuvyr_2,
+            R.raw.shuvyr_3,
+            R.raw.shuvyr_4,
+            R.raw.shuvyr_5,
+            R.raw.shuvyr_6
+        };
 
-        soundPool = createSoundPool();
-        soundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
-            @Override
-            public void onLoadComplete(SoundPool pool, int sampleId, int status) {
-                if (status == 0) {
-                    loadedSamples++;
-                }
-            }
-        });
-        sampleIds[0] = soundPool.load(this, R.raw.shuvyr_1, 1);
-        sampleIds[1] = soundPool.load(this, R.raw.shuvyr_2, 1);
-        sampleIds[2] = soundPool.load(this, R.raw.shuvyr_3, 1);
-        sampleIds[3] = soundPool.load(this, R.raw.shuvyr_4, 1);
-        sampleIds[4] = soundPool.load(this, R.raw.shuvyr_5, 1);
-        sampleIds[5] = soundPool.load(this, R.raw.shuvyr_6, 1);
+        for (int i = 0; i < resources.length; i++) {
+            players[i] = new SustainedWavPlayer(this, resources[i]);
+        }
     }
 
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
-        int soundNumber = mapPatternToSoundNumber(pattern, closedCount);
+        int soundNumber = mapPatternToSoundNumber(pattern);
         noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
 
-        if (loadedSamples < sampleIds.length) {
+        if (soundNumber == activeSoundNumber) {
             return;
         }
 
-        int sampleId = sampleIds[soundNumber - 1];
-        if (activeStreamId != 0) {
-            soundPool.stop(activeStreamId);
-        }
-        activeStreamId = soundPool.play(sampleId, 1f, 1f, 1, -1, 1f);
+        stopActive();
+        players[soundNumber - 1].playSustain();
+        activeSoundNumber = soundNumber;
     }
 
-    private void initFingeringMap() {
-        // Индексы дырочек в ShuvyrGameView: [L1, L2, L3, L4, R4, BOTTOM]
-        fingeringToSample.put(0b000000, 1);
-        fingeringToSample.put(0b000001, 2);
-        fingeringToSample.put(0b010011, 3);
-        fingeringToSample.put(0b001111, 4);
-        fingeringToSample.put(0b011111, 5);
-        fingeringToSample.put(0b111111, 6);
+    private int mapPatternToSoundNumber(int pattern) {
+        // Порядок дырок для «закрыть все до этой»: L1, L2, L3, R1, R2, R3.
+        int leadingClosed = 0;
+        for (int i = 0; i < 6; i++) {
+            if ((pattern & (1 << i)) != 0) {
+                leadingClosed++;
+            } else {
+                break;
+            }
+        }
+        return Math.min(6, leadingClosed + 1);
     }
 
-    private int mapPatternToSoundNumber(int pattern, int closedCount) {
-        Integer mapped = fingeringToSample.get(pattern & 0b111111);
-        if (mapped != null) {
-            return mapped;
+    private void stopActive() {
+        if (activeSoundNumber < 1 || activeSoundNumber > 6) {
+            return;
         }
-        return Math.max(1, Math.min(6, closedCount + 1));
-    }
-
-    private SoundPool createSoundPool() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build();
-            return new SoundPool.Builder()
-                .setMaxStreams(3)
-                .setAudioAttributes(audioAttributes)
-                .build();
-        }
-        return new SoundPool(3, android.media.AudioManager.STREAM_MUSIC, 0);
+        players[activeSoundNumber - 1].stop();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (soundPool != null) {
-            soundPool.release();
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].release();
+            }
         }
     }
 }
