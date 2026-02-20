@@ -58,16 +58,33 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private int mapPatternToSoundNumber(int pattern) {
-        // Порядок дырок: L1..L5, R1..R2. Следующий звук только при закрытии всех предыдущих.
-        int leadingClosed = 0;
-        for (int i = 0; i < 7; i++) {
+        // Эффективное зажатие: только непрерывно от первой дырки на каждой трубке.
+        // Индексы: long L1..L4 => bits 0..3, short R1..R2 => bits 4..5.
+        int longClosed = 0;
+        for (int i = 0; i < 4; i++) {
             if ((pattern & (1 << i)) != 0) {
-                leadingClosed++;
+                longClosed++;
             } else {
                 break;
             }
         }
-        return Math.min(SOUND_COUNT, leadingClosed + 1);
+
+        if (longClosed < 4) {
+            // 1ст..4ст
+            return longClosed + 1;
+        }
+
+        int shortClosed = 0;
+        for (int i = 4; i < 6; i++) {
+            if ((pattern & (1 << i)) != 0) {
+                shortClosed++;
+            } else {
+                break;
+            }
+        }
+
+        // 5ст: 4 длинные + 1 короткая, 6ст: все дырки.
+        return Math.min(SOUND_COUNT, 4 + shortClosed);
     }
 
     private void stopActiveWithRelease() {

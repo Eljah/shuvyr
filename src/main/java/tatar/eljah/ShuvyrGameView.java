@@ -17,7 +17,7 @@ public class ShuvyrGameView extends View {
         void onFingeringChanged(int closedCount, int pattern);
     }
 
-    private static final int LONG_PIPE_HOLES = 5;
+    private static final int LONG_PIPE_HOLES = 4;
     private static final int SHORT_PIPE_HOLES = 2;
     private static final int HOLE_COUNT = LONG_PIPE_HOLES + SHORT_PIPE_HOLES;
 
@@ -88,9 +88,9 @@ public class ShuvyrGameView extends View {
     private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX() + pipe.width() * 0.12f;
         float radius = pipe.width() * 0.15f;
-        float touchRadius = radius * 1.5f;
-        float startY = pipe.top + pipe.height() * 0.10f;
-        float step = pipe.height() * 0.18f;
+        float touchRadius = radius * 2.0f;
+        float startY = pipe.top + pipe.height() * 0.16f;
+        float step = pipe.height() * 0.22f;
 
         for (int i = 0; i < LONG_PIPE_HOLES; i++) {
             float cy = startY + i * step;
@@ -101,7 +101,7 @@ public class ShuvyrGameView extends View {
     private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX() - pipe.width() * 0.12f;
         float radius = pipe.width() * 0.15f;
-        float touchRadius = radius * 1.6f;
+        float touchRadius = radius * 2.0f;
 
         // Короткий ряд из 2 дырок на второй трубке с большим интервалом.
         float y1 = pipe.top + pipe.height() * 0.82f;
