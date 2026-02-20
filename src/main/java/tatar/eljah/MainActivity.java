@@ -32,12 +32,12 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             R.raw.shuvyr_6
         };
 
+        // Тайминги найденных фронтов (сек): конец атаки и начало заднего фронта.
+        float[] attackEnd = new float[] {0.28f, 0.32f, 0.24f, 0.25f, 0.32f, 0.20f};
+        float[] releaseStart = new float[] {2.62f, 2.83f, 2.41f, 2.47f, 2.34f, 2.69f};
+
         for (int i = 0; i < resources.length; i++) {
-            try {
-                players[i] = new SustainedWavPlayer(this, resources[i]);
-            } catch (RuntimeException e) {
-                players[i] = null;
-            }
+            players[i] = new SustainedWavPlayer(this, resources[i], attackEnd[i], releaseStart[i]);
         }
     }
 
@@ -50,15 +50,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             return;
         }
 
-        stopActive();
+        stopActiveWithRelease();
 
         SustainedWavPlayer next = players[soundNumber - 1];
-        if (next != null) {
-            next.playSustain();
-            activeSoundNumber = soundNumber;
-        } else {
-            activeSoundNumber = -1;
-        }
+        next.playSustain();
+        activeSoundNumber = soundNumber;
     }
 
     private int mapPatternToSoundNumber(int pattern) {
@@ -74,14 +70,12 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         return Math.min(SOUND_COUNT, leadingClosed + 1);
     }
 
-    private void stopActive() {
+    private void stopActiveWithRelease() {
         if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
             return;
         }
         SustainedWavPlayer active = players[activeSoundNumber - 1];
-        if (active != null) {
-            active.stop();
-        }
+        active.stopWithRelease();
     }
 
     @Override

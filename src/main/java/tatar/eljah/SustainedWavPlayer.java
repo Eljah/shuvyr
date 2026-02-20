@@ -12,12 +12,11 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class SustainedWavPlayer {
-    private static final float ATTACK_SKIP_SECONDS = 0.12f;
-
     private final AudioTrack track;
     private final int loopStartFrame;
+    private final int loopEndFrame;
 
-    public SustainedWavPlayer(Context context, int rawResId) {
+    public SustainedWavPlayer(Context context, int rawResId, float attackEndSec, float releaseStartSec) {
         byte[] wavData = readAll(context, rawResId);
         PcmData pcm = decodeToPcm16(wavData);
 
@@ -42,9 +41,12 @@ public class SustainedWavPlayer {
         int written = track.write(pcm.pcm16, 0, pcm.pcm16.length);
         int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
-        int desiredLoopStart = (int) (pcm.sampleRate * ATTACK_SKIP_SECONDS);
-        loopStartFrame = Math.max(0, Math.min(desiredLoopStart, Math.max(0, totalFrames - 1)));
-        track.setLoopPoints(loopStartFrame, totalFrames, -1);
+
+        int desiredStart = (int) (attackEndSec * pcm.sampleRate);
+        int desiredEnd = (int) (releaseStartSec * pcm.sampleRate);
+        loopStartFrame = Math.max(0, Math.min(desiredStart, Math.max(0, totalFrames - 2)));
+        loopEndFrame = Math.max(loopStartFrame + 1, Math.min(desiredEnd, totalFrames - 1));
+        track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
     }
 
     public void playSustain() {
@@ -57,23 +59,30 @@ public class SustainedWavPlayer {
         } catch (IllegalStateException ignored) {
         }
         track.reloadStaticData();
-        track.setPlaybackHeadPosition(loopStartFrame);
+        track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
+        track.setPlaybackHeadPosition(0);
         track.play();
     }
 
-    public void stop() {
+    public void stopWithRelease() {
         if (track.getState() != AudioTrack.STATE_INITIALIZED) {
             return;
         }
         try {
-            track.pause();
-            track.flush();
+            // Отключаем цикл: оставшаяся часть дойдет до конца с задним фронтом.
+            track.setLoopPoints(loopStartFrame, loopEndFrame, 0);
         } catch (IllegalStateException ignored) {
         }
     }
 
     public void release() {
-        stop();
+        if (track.getState() == AudioTrack.STATE_INITIALIZED) {
+            try {
+                track.pause();
+                track.flush();
+            } catch (IllegalStateException ignored) {
+            }
+        }
         track.release();
     }
 
