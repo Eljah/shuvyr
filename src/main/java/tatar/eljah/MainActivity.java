@@ -120,6 +120,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                 break;
             }
         }
+        return Math.min(SOUND_COUNT, 4 + shortClosed);
+    }
 
         int shortClosed = 0;
         if (longClosed == 4) {
