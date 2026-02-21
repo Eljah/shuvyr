@@ -25,6 +25,7 @@ public class ShuvyrGameView extends View {
     private static final int LONG_PIPE_HOLES = 4;
     private static final int SHORT_PIPE_HOLES = 2;
     private static final int HOLE_COUNT = LONG_PIPE_HOLES + SHORT_PIPE_HOLES;
+    private static final int SCHEMATIC_HOLES = 5;
     private static final int LONG_PIPE_LAST_HOLE_INDEX = 3;
     private static final int SHORT_PIPE_FIRST_HOLE_INDEX = 4;
     private static final float NORMAL_HOLE_RADIUS_RATIO = 0.01755f;
@@ -148,7 +149,7 @@ public class ShuvyrGameView extends View {
         float touchHalfX = schematicPipe.width() * 0.45f;
         float touchHalfY = step * 0.5f;
 
-        for (int i = 0; i < HOLE_COUNT; i++) {
+        for (int i = 0; i < SCHEMATIC_HOLES; i++) {
             float cy = startY + i * step;
             RectF touchArea = new RectF(cx - touchHalfX, cy - touchHalfY, cx + touchHalfX, cy + touchHalfY);
             holeAreas.add(touchArea);
@@ -250,7 +251,7 @@ public class ShuvyrGameView extends View {
                 }
             }
             if (selectedHole >= 0) {
-                for (int i = 0; i <= selectedHole && i < nextState.length; i++) {
+                for (int i = 0; i <= selectedHole && i < SCHEMATIC_HOLES; i++) {
                     nextState[i] = true;
                 }
             }

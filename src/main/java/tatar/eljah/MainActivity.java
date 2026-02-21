@@ -127,6 +127,18 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private int mapPatternToSoundNumber(int pattern) {
+        if (displayMode == ShuvyrGameView.DisplayMode.SCHEMATIC) {
+            int schematicClosed = 0;
+            for (int i = 0; i < 5; i++) {
+                if ((pattern & (1 << i)) != 0) {
+                    schematicClosed++;
+                } else {
+                    break;
+                }
+            }
+            return Math.min(SOUND_COUNT, schematicClosed + 1);
+        }
+
         if (pattern == (1 << 3) || pattern == (1 << 4) || pattern == ((1 << 3) | (1 << 4))) {
             return 5;
         }
