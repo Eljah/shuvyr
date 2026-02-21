@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.TextView;
 
 import tatar.eljah.shuvyr.R;
 
@@ -17,7 +16,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private int lastPattern = 0;
     private boolean airOn = false;
 
-    private TextView noteLabel;
     private ShuvyrGameView gameView;
     private SpectrogramView spectrogramView;
     private ImageButton modeToggle;
@@ -28,7 +26,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        noteLabel = findViewById(R.id.current_note_label);
         gameView = findViewById(R.id.shuvyr_view);
         spectrogramView = findViewById(R.id.spectrogram_view);
         modeToggle = findViewById(R.id.mode_toggle);
@@ -43,11 +40,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             R.raw.shuvyr_6
         };
 
-        float[] attackEnd = new float[] {0.28f, 0.32f, 0.24f, 0.25f, 0.32f, 0.20f};
-        float[] releaseStart = new float[] {2.62f, 2.83f, 2.41f, 2.47f, 2.34f, 2.69f};
-
         for (int i = 0; i < resources.length; i++) {
-            players[i] = new SustainedWavPlayer(this, resources[i], attackEnd[i], releaseStart[i]);
+            players[i] = new SustainedWavPlayer(this, resources[i]);
         }
 
         bindUiActions();
@@ -100,13 +94,9 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
     private void renderSoundState() {
         int soundNumber = mapPatternToSoundNumber(lastPattern);
-        int shownNote = soundNumber - 1;
-        int closedCount = countClosed(lastPattern);
-
-        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(shownNote), closedCount));
 
         if (!airOn) {
-            stopAllSounds();
+            stopAirWithRelease();
             spectrogramView.setAirOn(false);
             return;
         }
@@ -120,22 +110,16 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         if (soundNumber == activeSoundNumber) {
             return;
         }
-        stopPreviousReleaseIfAny();
-        moveActiveToRelease();
-
         SustainedWavPlayer next = players[soundNumber - 1];
-        next.playSustain();
-        activeSoundNumber = soundNumber;
-    }
-
-    private int countClosed(int pattern) {
-        int count = 0;
-        for (int i = 0; i < SOUND_COUNT; i++) {
-            if ((pattern & (1 << i)) != 0) {
-                count++;
-            }
+        if (activeSoundNumber == -1) {
+            stopPreviousReleaseIfAny();
+            next.playSustain();
+        } else {
+            hardStopActive();
+            stopPreviousReleaseIfAny();
+            next.playLoopOnly();
         }
-        return count;
+        activeSoundNumber = soundNumber;
     }
 
     private int mapPatternToSoundNumber(int pattern) {
@@ -185,14 +169,18 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         releasingSoundNumber = -1;
     }
 
-    private void stopAllSounds() {
-        for (int i = 0; i < players.length; i++) {
-            if (players[i] != null) {
-                players[i].hardStop();
-            }
+    private void hardStopActive() {
+        if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
+            return;
         }
+        players[activeSoundNumber - 1].hardStop();
         activeSoundNumber = -1;
-        releasingSoundNumber = -1;
+    }
+
+    private void stopAirWithRelease() {
+        stopPreviousReleaseIfAny();
+        moveActiveToRelease();
+        activeSoundNumber = -1;
     }
 
     @Override

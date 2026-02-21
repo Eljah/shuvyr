@@ -16,7 +16,7 @@ public class SustainedWavPlayer {
     private final int loopStartFrame;
     private final int loopEndFrame;
 
-    public SustainedWavPlayer(Context context, int rawResId, float attackEndSec, float releaseStartSec) {
+    public SustainedWavPlayer(Context context, int rawResId) {
         byte[] wavData = readAll(context, rawResId);
         PcmData pcm = decodeToPcm16(wavData);
 
@@ -41,11 +41,9 @@ public class SustainedWavPlayer {
         int written = track.write(pcm.pcm16, 0, pcm.pcm16.length);
         int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
-
-        int desiredStart = (int) (attackEndSec * pcm.sampleRate);
-        int desiredEnd = (int) (releaseStartSec * pcm.sampleRate);
-        loopStartFrame = Math.max(0, Math.min(desiredStart, Math.max(0, totalFrames - 2)));
-        loopEndFrame = Math.max(loopStartFrame + 1, Math.min(desiredEnd, totalFrames - 1));
+        int[] loop = detectSustainLoop(pcm.pcm16, totalFrames, pcm.sampleRate, pcm.channelCount);
+        loopStartFrame = loop[0];
+        loopEndFrame = loop[1];
         track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
     }
 
@@ -61,6 +59,21 @@ public class SustainedWavPlayer {
         track.reloadStaticData();
         track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
         track.setPlaybackHeadPosition(0);
+        track.play();
+    }
+
+    public void playLoopOnly() {
+        if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            return;
+        }
+        try {
+            track.pause();
+            track.flush();
+        } catch (IllegalStateException ignored) {
+        }
+        track.reloadStaticData();
+        track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
+        track.setPlaybackHeadPosition(loopStartFrame);
         track.play();
     }
 
@@ -248,5 +261,129 @@ public class SustainedWavPlayer {
             this.channelCount = channelCount;
             this.pcm16 = pcm16;
         }
+    }
+
+    private static int[] detectSustainLoop(byte[] pcm16, int totalFrames, int sampleRate, int channelCount) {
+        if (totalFrames < 4) {
+            return new int[] {0, Math.max(1, totalFrames - 1)};
+        }
+
+        int windowFrames = Math.max(256, sampleRate / 18);
+        windowFrames = Math.min(windowFrames, totalFrames);
+        int stepFrames = Math.max(64, windowFrames / 4);
+
+        int bestCenter = totalFrames / 2;
+        double bestEnergy = -1d;
+        int centerMin = Math.max(windowFrames / 2, totalFrames / 5);
+        int centerMax = Math.min(totalFrames - windowFrames / 2 - 1, totalFrames * 4 / 5);
+
+        for (int center = centerMin; center <= centerMax; center += stepFrames) {
+            int start = center - windowFrames / 2;
+            int end = Math.min(totalFrames, start + windowFrames);
+            double rms = rmsEnergy(pcm16, start, end, channelCount);
+            if (rms > bestEnergy) {
+                bestEnergy = rms;
+                bestCenter = center;
+            }
+        }
+
+        int approxPeriod = estimatePeriodFrames(pcm16, bestCenter, sampleRate, channelCount, totalFrames);
+        int periods = Math.max(8, Math.min(20, sampleRate / Math.max(1, approxPeriod)));
+        int loopLen = Math.max(approxPeriod * periods, windowFrames);
+        int halfLen = loopLen / 2;
+
+        int rawStart = Math.max(0, bestCenter - halfLen);
+        int rawEnd = Math.min(totalFrames - 1, rawStart + loopLen);
+        if (rawEnd <= rawStart + 1) {
+            rawStart = Math.max(0, totalFrames / 3);
+            rawEnd = Math.min(totalFrames - 1, rawStart + Math.max(2, sampleRate / 3));
+        }
+
+        int start = findNearestZeroCrossing(pcm16, rawStart, channelCount, -Math.max(16, approxPeriod), Math.max(16, approxPeriod), totalFrames);
+        int end = findNearestZeroCrossing(pcm16, rawEnd, channelCount, -Math.max(16, approxPeriod), Math.max(16, approxPeriod), totalFrames);
+        if (end <= start + 1) {
+            end = Math.min(totalFrames - 1, start + Math.max(2, approxPeriod * 8));
+        }
+
+        return new int[] {Math.max(0, start), Math.max(start + 1, Math.min(totalFrames - 1, end))};
+    }
+
+    private static double rmsEnergy(byte[] pcm16, int startFrame, int endFrame, int channelCount) {
+        long sum = 0L;
+        int count = 0;
+        for (int frame = Math.max(0, startFrame); frame < endFrame; frame++) {
+            for (int ch = 0; ch < channelCount; ch++) {
+                int sample = readSample(pcm16, frame, ch, channelCount);
+                sum += (long) sample * sample;
+                count++;
+            }
+        }
+        return count == 0 ? 0d : Math.sqrt(sum / (double) count);
+    }
+
+    private static int estimatePeriodFrames(byte[] pcm16, int centerFrame, int sampleRate, int channelCount, int totalFrames) {
+        int minPeriod = Math.max(12, sampleRate / 1400);
+        int maxPeriod = Math.max(minPeriod + 1, sampleRate / 70);
+        int analysisLen = Math.min(sampleRate / 8, totalFrames / 2);
+        int start = Math.max(0, centerFrame - analysisLen / 2);
+        int end = Math.min(totalFrames, start + analysisLen);
+        if (end - start < maxPeriod * 2) {
+            return Math.max(24, sampleRate / 220);
+        }
+
+        double bestCorr = Double.NEGATIVE_INFINITY;
+        int bestLag = Math.max(minPeriod, sampleRate / 330);
+        for (int lag = minPeriod; lag <= maxPeriod; lag++) {
+            double corr = 0d;
+            for (int i = start; i + lag < end; i++) {
+                int a = monoSample(pcm16, i, channelCount);
+                int b = monoSample(pcm16, i + lag, channelCount);
+                corr += (double) a * b;
+            }
+            if (corr > bestCorr) {
+                bestCorr = corr;
+                bestLag = lag;
+            }
+        }
+        return bestLag;
+    }
+
+    private static int findNearestZeroCrossing(byte[] pcm16, int frame, int channelCount, int minDelta, int maxDelta, int totalFrames) {
+        int bestFrame = Math.max(0, Math.min(totalFrames - 1, frame));
+        int bestAbs = Integer.MAX_VALUE;
+        for (int delta = minDelta; delta <= maxDelta; delta++) {
+            int f = frame + delta;
+            if (f < 1 || f >= totalFrames - 1) {
+                continue;
+            }
+            int prev = monoSample(pcm16, f - 1, channelCount);
+            int cur = monoSample(pcm16, f, channelCount);
+            if ((prev <= 0 && cur >= 0) || (prev >= 0 && cur <= 0)) {
+                int abs = Math.abs(cur) + Math.abs(prev);
+                if (abs < bestAbs) {
+                    bestAbs = abs;
+                    bestFrame = f;
+                }
+            }
+        }
+        return bestFrame;
+    }
+
+    private static int monoSample(byte[] pcm16, int frame, int channelCount) {
+        int sum = 0;
+        for (int ch = 0; ch < channelCount; ch++) {
+            sum += readSample(pcm16, frame, ch, channelCount);
+        }
+        return sum / channelCount;
+    }
+
+    private static int readSample(byte[] pcm16, int frame, int channel, int channelCount) {
+        int index = (frame * channelCount + channel) * 2;
+        if (index < 0 || index + 1 >= pcm16.length) {
+            return 0;
+        }
+        int lo = pcm16[index] & 0xFF;
+        int hi = pcm16[index + 1];
+        return (short) ((hi << 8) | lo);
     }
 }
