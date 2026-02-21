@@ -17,6 +17,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private int activeSoundNumber = -1;
     private int releasingSoundNumber = -1;
     private int lastPattern = 0;
+    private boolean airOn = false;
 
     private TextView noteLabel;
     private ShuvyrGameView gameView;
@@ -52,6 +53,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
 
         bindUiActions();
+        renderSoundState();
     }
 
     private void bindUiActions() {
@@ -60,13 +62,14 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    playSound(1, getString(R.string.current_note_zero));
+                    airOn = true;
+                    renderSoundState();
                     return true;
                 }
                 if (event.getActionMasked() == MotionEvent.ACTION_UP
                     || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    stopAllSounds();
-                    updateByPattern(lastPattern);
+                    airOn = false;
+                    renderSoundState();
                     return true;
                 }
                 return false;
@@ -85,8 +88,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                 modeToggle.setText(schematic
                     ? getString(R.string.main_mode_schematic)
                     : getString(R.string.main_mode_normal));
-                stopAllSounds();
-                updateByPattern(0);
+                renderSoundState();
             }
         });
     }
@@ -94,21 +96,28 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
         lastPattern = pattern;
-        updateByPattern(pattern);
-        int soundNumber = mapPatternToSoundNumber(pattern);
-        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
+        renderSoundState();
     }
 
-    private void updateByPattern(int pattern) {
-        int soundNumber = mapPatternToSoundNumber(pattern);
-        playSound(soundNumber, String.valueOf(soundNumber));
-    }
-
-    private void playSound(int soundNumber, String shownNote) {
+    private void renderSoundState() {
+        int soundNumber = mapPatternToSoundNumber(lastPattern);
+        int shownNote = soundNumber - 1;
         int closedCount = countClosed(lastPattern);
-        noteLabel.setText(getString(R.string.current_note_template, shownNote, closedCount));
-        spectrogramView.setActiveSoundNumber(soundNumber);
 
+        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(shownNote), closedCount));
+
+        if (!airOn) {
+            stopAllSounds();
+            spectrogramView.setAirOn(false);
+            return;
+        }
+
+        spectrogramView.setActiveSoundNumber(soundNumber);
+        spectrogramView.setAirOn(true);
+        playSound(soundNumber);
+    }
+
+    private void playSound(int soundNumber) {
         if (soundNumber == activeSoundNumber) {
             return;
         }
@@ -185,19 +194,20 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
         activeSoundNumber = -1;
         releasingSoundNumber = -1;
-        spectrogramView.setActiveSoundNumber(0);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        stopAllSounds();
+        airOn = false;
+        renderSoundState();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopAllSounds();
+        airOn = false;
+        renderSoundState();
         for (int i = 0; i < players.length; i++) {
             if (players[i] != null) {
                 players[i].release();
