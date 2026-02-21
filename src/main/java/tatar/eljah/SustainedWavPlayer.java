@@ -42,6 +42,7 @@ public class SustainedWavPlayer {
         int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
         int[] loop = detectSustainLoop(pcm.pcm16, totalFrames, pcm.sampleRate, pcm.channelCount);
+        smoothLoopBoundary(pcm.pcm16, loop[0], loop[1], pcm.sampleRate, pcm.channelCount);
         loopStartFrame = loop[0];
         loopEndFrame = loop[1];
         track.setLoopPoints(loopStartFrame, loopEndFrame, -1);
@@ -268,9 +269,9 @@ public class SustainedWavPlayer {
             return new int[] {0, Math.max(1, totalFrames - 1)};
         }
 
-        int windowFrames = Math.max(256, sampleRate / 18);
+        int windowFrames = Math.max(512, sampleRate / 12);
         windowFrames = Math.min(windowFrames, totalFrames);
-        int stepFrames = Math.max(64, windowFrames / 4);
+        int stepFrames = Math.max(64, windowFrames / 5);
 
         int bestCenter = totalFrames / 2;
         double bestEnergy = -1d;
@@ -278,9 +279,9 @@ public class SustainedWavPlayer {
         int centerMax = Math.min(totalFrames - windowFrames / 2 - 1, totalFrames * 4 / 5);
 
         for (int center = centerMin; center <= centerMax; center += stepFrames) {
-            int start = center - windowFrames / 2;
-            int end = Math.min(totalFrames, start + windowFrames);
-            double rms = rmsEnergy(pcm16, start, end, channelCount);
+            int startFrame = center - windowFrames / 2;
+            int endFrame = Math.min(totalFrames, startFrame + windowFrames);
+            double rms = rmsEnergy(pcm16, startFrame, endFrame, channelCount);
             if (rms > bestEnergy) {
                 bestEnergy = rms;
                 bestCenter = center;
@@ -288,21 +289,25 @@ public class SustainedWavPlayer {
         }
 
         int approxPeriod = estimatePeriodFrames(pcm16, bestCenter, sampleRate, channelCount, totalFrames);
-        int periods = Math.max(8, Math.min(20, sampleRate / Math.max(1, approxPeriod)));
+        int periods = Math.max(16, Math.min(48, sampleRate / Math.max(1, approxPeriod)));
         int loopLen = Math.max(approxPeriod * periods, windowFrames);
-        int halfLen = loopLen / 2;
 
-        int rawStart = Math.max(0, bestCenter - halfLen);
+        int rawStart = Math.max(0, bestCenter - loopLen / 2);
         int rawEnd = Math.min(totalFrames - 1, rawStart + loopLen);
         if (rawEnd <= rawStart + 1) {
             rawStart = Math.max(0, totalFrames / 3);
-            rawEnd = Math.min(totalFrames - 1, rawStart + Math.max(2, sampleRate / 3));
+            rawEnd = Math.min(totalFrames - 1, rawStart + Math.max(2, sampleRate / 2));
         }
 
-        int start = findNearestZeroCrossing(pcm16, rawStart, channelCount, -Math.max(16, approxPeriod), Math.max(16, approxPeriod), totalFrames);
-        int end = findNearestZeroCrossing(pcm16, rawEnd, channelCount, -Math.max(16, approxPeriod), Math.max(16, approxPeriod), totalFrames);
+        int search = Math.max(24, approxPeriod * 2);
+        int start = findNearestZeroCrossing(pcm16, rawStart, channelCount, -search, search, totalFrames);
+        int minLoop = Math.max(approxPeriod * 8, sampleRate / 8);
+        int maxLoop = Math.max(minLoop + approxPeriod * 2, sampleRate);
+        int targetEnd = Math.max(start + minLoop, rawEnd);
+        int end = findBestLoopEnd(pcm16, start, targetEnd, approxPeriod, minLoop, maxLoop, channelCount, totalFrames);
+
         if (end <= start + 1) {
-            end = Math.min(totalFrames - 1, start + Math.max(2, approxPeriod * 8));
+            end = Math.min(totalFrames - 1, start + Math.max(2, approxPeriod * 10));
         }
 
         return new int[] {Math.max(0, start), Math.max(start + 1, Math.min(totalFrames - 1, end))};
@@ -369,6 +374,74 @@ public class SustainedWavPlayer {
         return bestFrame;
     }
 
+    private static int findBestLoopEnd(byte[] pcm16, int start, int targetEnd, int approxPeriod,
+                                       int minLoop, int maxLoop, int channelCount, int totalFrames) {
+        int search = Math.max(24, approxPeriod * 2);
+        int bestEnd = Math.min(totalFrames - 1, Math.max(start + minLoop, targetEnd));
+        long bestScore = Long.MAX_VALUE;
+        int candidateMin = Math.max(start + minLoop, targetEnd - maxLoop / 2);
+        int candidateMax = Math.min(totalFrames - 1, start + maxLoop);
+        int compareFrames = Math.max(48, approxPeriod * 2);
+
+        for (int frame = candidateMin; frame <= candidateMax; frame += Math.max(1, approxPeriod / 2)) {
+            int candidate = findNearestZeroCrossing(pcm16, frame, channelCount, -search, search, totalFrames);
+            if (candidate <= start + 1 || candidate >= totalFrames - 1) {
+                continue;
+            }
+            int loopLen = candidate - start;
+            if (loopLen < minLoop || loopLen > maxLoop) {
+                continue;
+            }
+            long score = loopMatchScore(pcm16, start, candidate, compareFrames, channelCount);
+            if (score < bestScore) {
+                bestScore = score;
+                bestEnd = candidate;
+            }
+        }
+        return bestEnd;
+    }
+
+    private static long loopMatchScore(byte[] pcm16, int start, int end, int compareFrames, int channelCount) {
+        long score = 0L;
+        int tailStart = Math.max(start, end - compareFrames);
+        int length = Math.max(1, end - tailStart);
+        for (int i = 0; i < length; i++) {
+            int headFrame = start + i;
+            int tailFrame = tailStart + i;
+            for (int ch = 0; ch < channelCount; ch++) {
+                int a = readSample(pcm16, headFrame, ch, channelCount);
+                int b = readSample(pcm16, tailFrame, ch, channelCount);
+                int diff = a - b;
+                score += (long) diff * diff;
+            }
+        }
+        return score;
+    }
+
+    private static void smoothLoopBoundary(byte[] pcm16, int loopStart, int loopEnd, int sampleRate, int channelCount) {
+        int loopLength = loopEnd - loopStart;
+        if (loopLength < 8) {
+            return;
+        }
+        int fadeFrames = Math.min(loopLength / 4, Math.max(64, sampleRate / 80));
+        if (fadeFrames < 8) {
+            return;
+        }
+
+        int tailStart = loopEnd - fadeFrames;
+        for (int i = 0; i < fadeFrames; i++) {
+            float t = (i + 1f) / (fadeFrames + 1f);
+            int headFrame = loopStart + i;
+            int tailFrame = tailStart + i;
+            for (int ch = 0; ch < channelCount; ch++) {
+                int from = readSample(pcm16, tailFrame, ch, channelCount);
+                int to = readSample(pcm16, headFrame, ch, channelCount);
+                int blended = Math.round(from * (1f - t) + to * t);
+                writeSample(pcm16, tailFrame, ch, channelCount, blended);
+            }
+        }
+    }
+
     private static int monoSample(byte[] pcm16, int frame, int channelCount) {
         int sum = 0;
         for (int ch = 0; ch < channelCount; ch++) {
@@ -385,5 +458,15 @@ public class SustainedWavPlayer {
         int lo = pcm16[index] & 0xFF;
         int hi = pcm16[index + 1];
         return (short) ((hi << 8) | lo);
+    }
+
+    private static void writeSample(byte[] pcm16, int frame, int channel, int channelCount, int sample) {
+        int index = (frame * channelCount + channel) * 2;
+        if (index < 0 || index + 1 >= pcm16.length) {
+            return;
+        }
+        int clamped = Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, sample));
+        pcm16[index] = (byte) (clamped & 0xFF);
+        pcm16[index + 1] = (byte) ((clamped >> 8) & 0xFF);
     }
 }

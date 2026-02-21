@@ -183,18 +183,38 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         activeSoundNumber = -1;
     }
 
+    private void stopAllSoundsImmediately() {
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].hardStop();
+            }
+        }
+        activeSoundNumber = -1;
+        releasingSoundNumber = -1;
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
         airOn = false;
-        renderSoundState();
+        spectrogramView.setAirOn(false);
+        stopAllSoundsImmediately();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        airOn = false;
+        spectrogramView.setAirOn(false);
+        stopAllSoundsImmediately();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         airOn = false;
-        renderSoundState();
+        spectrogramView.setAirOn(false);
+        stopAllSoundsImmediately();
         for (int i = 0; i < players.length; i++) {
             if (players[i] != null) {
                 players[i].release();
