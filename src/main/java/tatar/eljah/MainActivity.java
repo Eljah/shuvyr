@@ -2,6 +2,8 @@ package tatar.eljah;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import tatar.eljah.shuvyr.R;
@@ -12,8 +14,14 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private final SustainedWavPlayer[] players = new SustainedWavPlayer[SOUND_COUNT];
     private int activeSoundNumber = -1;
     private int releasingSoundNumber = -1;
+    private int lastPattern = 0;
+    private boolean airOn = false;
 
     private TextView noteLabel;
+    private ShuvyrGameView gameView;
+    private SpectrogramView spectrogramView;
+    private ImageButton modeToggle;
+    private ShuvyrGameView.DisplayMode displayMode = ShuvyrGameView.DisplayMode.NORMAL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,7 +29,9 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         setContentView(R.layout.activity_main);
 
         noteLabel = findViewById(R.id.current_note_label);
-        ShuvyrGameView gameView = findViewById(R.id.shuvyr_view);
+        gameView = findViewById(R.id.shuvyr_view);
+        spectrogramView = findViewById(R.id.spectrogram_view);
+        modeToggle = findViewById(R.id.mode_toggle);
         gameView.setOnFingeringChangeListener(this);
 
         int[] resources = new int[] {
@@ -33,24 +43,83 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             R.raw.shuvyr_6
         };
 
-        // Тайминги найденных фронтов (сек): конец атаки и начало заднего фронта.
         float[] attackEnd = new float[] {0.28f, 0.32f, 0.24f, 0.25f, 0.32f, 0.20f};
         float[] releaseStart = new float[] {2.62f, 2.83f, 2.41f, 2.47f, 2.34f, 2.69f};
 
         for (int i = 0; i < resources.length; i++) {
             players[i] = new SustainedWavPlayer(this, resources[i], attackEnd[i], releaseStart[i]);
         }
+
+        bindUiActions();
+        updateModeUi();
+        renderSoundState();
     }
 
+    private void bindUiActions() {
+        final ImageButton lipsButton = findViewById(R.id.lips_button);
+        lipsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                airOn = !airOn;
+                lipsButton.setAlpha(airOn ? 1.0f : 0.55f);
+                renderSoundState();
+            }
+        });
+        lipsButton.setAlpha(0.55f);
+
+        modeToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                displayMode = displayMode == ShuvyrGameView.DisplayMode.NORMAL
+                    ? ShuvyrGameView.DisplayMode.SCHEMATIC
+                    : ShuvyrGameView.DisplayMode.NORMAL;
+                gameView.setDisplayMode(displayMode);
+                updateModeUi();
+                renderSoundState();
+            }
+        });
+    }
+
+
+    private void updateModeUi() {
+        boolean schematic = displayMode == ShuvyrGameView.DisplayMode.SCHEMATIC;
+        spectrogramView.setVisibility(schematic ? View.VISIBLE : View.GONE);
+        modeToggle.setImageResource(schematic ? R.drawable.ic_mode_bagpipe : R.drawable.ic_mode_spectrogram);
+        modeToggle.setContentDescription(getString(schematic
+            ? R.string.main_mode_schematic
+            : R.string.main_mode_normal));
+
+        final int bottomInset = schematic ? spectrogramView.getLayoutParams().height : 0;
+        gameView.setBottomInsetPx(bottomInset);
+    }
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
-        int soundNumber = mapPatternToSoundNumber(pattern);
-        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
+        lastPattern = pattern;
+        renderSoundState();
+    }
 
-        if (soundNumber == activeSoundNumber) {
+    private void renderSoundState() {
+        int soundNumber = mapPatternToSoundNumber(lastPattern);
+        int shownNote = soundNumber - 1;
+        int closedCount = countClosed(lastPattern);
+
+        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(shownNote), closedCount));
+
+        if (!airOn) {
+            stopAllSounds();
+            spectrogramView.setAirOn(false);
             return;
         }
 
+        spectrogramView.setActiveSoundNumber(soundNumber);
+        spectrogramView.setAirOn(true);
+        playSound(soundNumber);
+    }
+
+    private void playSound(int soundNumber) {
+        if (soundNumber == activeSoundNumber) {
+            return;
+        }
         stopPreviousReleaseIfAny();
         moveActiveToRelease();
 
@@ -59,9 +128,17 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         activeSoundNumber = soundNumber;
     }
 
+    private int countClosed(int pattern) {
+        int count = 0;
+        for (int i = 0; i < SOUND_COUNT; i++) {
+            if ((pattern & (1 << i)) != 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private int mapPatternToSoundNumber(int pattern) {
-        // Эффективное зажатие: учитывается только непрерывный префикс от первой дырки.
-        // Индексы: long L1..L4 => bits 0..3, short R1..R2 => bits 4..5.
         int longMask = pattern & 0b001111;
         int shortMask = (pattern >> 4) & 0b000011;
 
@@ -85,7 +162,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             }
         }
 
-        // 1ст: 0 зажатий; 2..4ст: 1..3 на длинной; 5ст: 4+1; 6ст: 4+2.
         if (longClosed < 4) {
             return longClosed + 1;
         }
@@ -109,9 +185,28 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         releasingSoundNumber = -1;
     }
 
+    private void stopAllSounds() {
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].hardStop();
+            }
+        }
+        activeSoundNumber = -1;
+        releasingSoundNumber = -1;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        airOn = false;
+        renderSoundState();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        airOn = false;
+        renderSoundState();
         for (int i = 0; i < players.length; i++) {
             if (players[i] != null) {
                 players[i].release();
