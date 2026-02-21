@@ -13,7 +13,7 @@ import java.util.List;
 public class SpectrogramView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 4000f;
     private static final int MAX_HISTORY_COLUMNS = 1920;
-    private static final float[] NOTE_BASE_HZ = new float[] {220f, 300f, 380f, 460f, 620f, 760f};
+    private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
 
     private final Paint spectrogramGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint heatPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
