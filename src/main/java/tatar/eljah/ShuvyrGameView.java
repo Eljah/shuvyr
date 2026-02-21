@@ -17,16 +17,19 @@ public class ShuvyrGameView extends View {
         void onFingeringChanged(int closedCount, int pattern);
     }
 
-    private static final int HOLES_PER_PIPE = 3;
+    private static final int LONG_PIPE_HOLES = 4;
+    private static final int SHORT_PIPE_HOLES = 2;
+    private static final int HOLE_COUNT = LONG_PIPE_HOLES + SHORT_PIPE_HOLES;
 
     private final Paint pipePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint holeOpenPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint holeClosedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final List<RectF> holeAreas = new ArrayList<>();
-    private final boolean[] closed = new boolean[HOLES_PER_PIPE * 2];
+    private final List<RectF> holeAreas = new ArrayList<RectF>();
+    private final boolean[] closed = new boolean[HOLE_COUNT];
 
     private OnFingeringChangeListener listener;
+    private boolean schematicMode;
 
     public ShuvyrGameView(Context context) {
         super(context);
@@ -47,6 +50,11 @@ public class ShuvyrGameView extends View {
         this.listener = listener;
     }
 
+    public void setSchematicMode(boolean schematicMode) {
+        this.schematicMode = schematicMode;
+        invalidate();
+    }
+
     private void init() {
         pipePaint.setColor(Color.parseColor("#D5B07A"));
         borderPaint.setColor(Color.parseColor("#5E4427"));
@@ -64,53 +72,90 @@ public class ShuvyrGameView extends View {
         float w = getWidth();
         float h = getHeight();
         float pipeWidth = w * 0.24f;
-        float pipeHeight = h * 0.75f;
-        float top = h * 0.12f;
-        float left1 = w * 0.18f;
-        float left2 = w * 0.58f;
+        float pipeHeight = h * 0.80f;
+        float top = h * 0.10f;
 
-        RectF pipe1 = new RectF(left1, top, left1 + pipeWidth, top + pipeHeight);
-        RectF pipe2 = new RectF(left2, top, left2 + pipeWidth, top + pipeHeight);
-        canvas.drawRoundRect(pipe1, 36f, 36f, pipePaint);
-        canvas.drawRoundRect(pipe1, 36f, 36f, borderPaint);
-        canvas.drawRoundRect(pipe2, 36f, 36f, pipePaint);
-        canvas.drawRoundRect(pipe2, 36f, 36f, borderPaint);
+        float leftPipeLeft = w * 0.18f;
+        float rightPipeLeft = w * 0.47f;
+
+        RectF longPipe = new RectF(leftPipeLeft, top, leftPipeLeft + pipeWidth, top + pipeHeight);
+        RectF shortPipe = new RectF(rightPipeLeft, top, rightPipeLeft + pipeWidth, top + pipeHeight);
+
+        canvas.drawRoundRect(longPipe, 36f, 36f, pipePaint);
+        canvas.drawRoundRect(longPipe, 36f, 36f, borderPaint);
+        canvas.drawRoundRect(shortPipe, 36f, 36f, pipePaint);
+        canvas.drawRoundRect(shortPipe, 36f, 36f, borderPaint);
 
         holeAreas.clear();
-        drawHoles(canvas, pipe1, 0);
-        drawHoles(canvas, pipe2, HOLES_PER_PIPE);
+        drawLongPipeHoles(canvas, longPipe, 0);
+        drawShortPipeHoles(canvas, shortPipe, LONG_PIPE_HOLES);
     }
 
-    private void drawHoles(Canvas canvas, RectF pipe, int offset) {
+    private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
-        float spacing = pipe.height() / (HOLES_PER_PIPE + 1);
-        float radius = pipe.width() * 0.24f;
+        float radius = pipe.width() * 0.15f;
+        float touchHalf = pipe.width() * 0.48f;
+        float startY = pipe.top + pipe.height() * 0.16f;
+        float step = pipe.height() * 0.18f;
 
-        for (int i = 0; i < HOLES_PER_PIPE; i++) {
-            float cy = pipe.top + spacing * (i + 1);
-            RectF holeArea = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
-            holeAreas.add(holeArea);
-            canvas.drawCircle(cx, cy, radius, closed[offset + i] ? holeClosedPaint : holeOpenPaint);
-            canvas.drawCircle(cx, cy, radius, borderPaint);
+        for (int i = 0; i < LONG_PIPE_HOLES; i++) {
+            float cy = startY + i * step;
+            drawHole(canvas, cx, cy, radius, touchHalf, offset + i);
         }
+    }
+
+    private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
+        float cx = pipe.centerX();
+        float radius = pipe.width() * 0.15f;
+        float touchHalf = pipe.width() * 0.48f;
+
+        float startY = pipe.top + pipe.height() * 0.16f;
+        float step = pipe.height() * 0.18f;
+        float y1 = startY + step * 3f;
+        float y2 = y1 + step;
+
+        drawHole(canvas, cx, y1, radius, touchHalf, offset);
+        drawHole(canvas, cx, y2, radius, touchHalf, offset + 1);
+    }
+
+    private void drawHole(Canvas canvas, float x, float y, float radius, float touchHalf, int holeIndex) {
+        RectF holeArea = new RectF(x - touchHalf, y - touchHalf, x + touchHalf, y + touchHalf);
+        holeAreas.add(holeArea);
+        canvas.drawCircle(x, y, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
+        canvas.drawCircle(x, y, radius, borderPaint);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
-        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
+        if (action != MotionEvent.ACTION_DOWN
+            && action != MotionEvent.ACTION_MOVE
+            && action != MotionEvent.ACTION_UP
+            && action != MotionEvent.ACTION_POINTER_DOWN
+            && action != MotionEvent.ACTION_POINTER_UP
+            && action != MotionEvent.ACTION_CANCEL) {
             return super.onTouchEvent(event);
         }
 
         boolean changed = false;
         boolean[] nextState = new boolean[closed.length];
 
-        for (int i = 0; i < event.getPointerCount(); i++) {
-            float x = event.getX(i);
-            float y = event.getY(i);
-            for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
-                if (holeAreas.get(holeIndex).contains(x, y)) {
-                    nextState[holeIndex] = true;
+        if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) {
+            int skipPointer = action == MotionEvent.ACTION_POINTER_UP ? event.getActionIndex() : -1;
+            for (int i = 0; i < event.getPointerCount(); i++) {
+                if (i == skipPointer) {
+                    continue;
+                }
+                float x = event.getX(i);
+                float y = event.getY(i);
+                for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
+                    if (holeAreas.get(holeIndex).contains(x, y)) {
+                        if (schematicMode) {
+                            applySchematicPress(nextState, holeIndex);
+                        } else {
+                            nextState[holeIndex] = true;
+                        }
+                    }
                 }
             }
         }
@@ -138,5 +183,22 @@ public class ShuvyrGameView extends View {
         }
 
         return true;
+    }
+
+    private void applySchematicPress(boolean[] state, int holeIndex) {
+        if (holeIndex < LONG_PIPE_HOLES) {
+            for (int i = 0; i <= holeIndex; i++) {
+                state[i] = true;
+            }
+            return;
+        }
+
+        for (int i = 0; i < LONG_PIPE_HOLES; i++) {
+            state[i] = true;
+        }
+        int shortIndex = holeIndex - LONG_PIPE_HOLES;
+        for (int i = 0; i <= shortIndex; i++) {
+            state[LONG_PIPE_HOLES + i] = true;
+        }
     }
 }

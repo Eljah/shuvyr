@@ -24,12 +24,45 @@
         android:textColor="#D0D0D0"
         android:gravity="center" />
 
-    <tatar.eljah.ShuvyrGameView
-        android:id="@+id/shuvyr_view"
+    <Button
+        android:id="@+id/mode_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_gravity="center_horizontal"
+        android:text="Схема OFF" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <tatar.eljah.ShuvyrGameView
+            android:id="@+id/shuvyr_view"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/lips_button"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp"
+            android:background="#2A3A2A"
+            android:contentDescription="Губы"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:tint="#F8F2E8" />
+    </LinearLayout>
+
+    <tatar.eljah.SpectrumView
+        android:id="@+id/spectrum_view"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:visibility="gone"
+        android:layout_marginTop="8dp" />
 
     <TextView
         android:id="@+id/current_note_label"
