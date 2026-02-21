@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                     ? ShuvyrGameView.DisplayMode.SCHEMATIC
                     : ShuvyrGameView.DisplayMode.NORMAL;
                 gameView.setDisplayMode(displayMode);
+                stopAllSoundsImmediately();
                 updateModeUi();
                 renderSoundState();
             }
@@ -100,6 +101,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
         if (!airOn) {
             spectrogramView.setAirOn(false);
+            stopAllSoundsImmediately();
             return;
         }
 
@@ -125,6 +127,40 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private int mapPatternToSoundNumber(int pattern) {
+        if (displayMode == ShuvyrGameView.DisplayMode.SCHEMATIC) {
+            int longMask = pattern & 0b001111;
+            int shortMask = (pattern >> 4) & 0b000011;
+
+            int longClosed = 0;
+            for (int i = 0; i < 4; i++) {
+                if ((longMask & (1 << i)) != 0) {
+                    longClosed++;
+                } else {
+                    break;
+                }
+            }
+
+            int shortClosed = 0;
+            if (longClosed == 4) {
+                for (int i = 0; i < 2; i++) {
+                    if ((shortMask & (1 << i)) != 0) {
+                        shortClosed++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            if (longClosed < 4) {
+                return longClosed + 1;
+            }
+            return Math.min(SOUND_COUNT, 4 + shortClosed);
+        }
+
+        if (pattern == (1 << 3) || pattern == (1 << 4) || pattern == ((1 << 3) | (1 << 4))) {
+            return 5;
+        }
+
         int longMask = pattern & 0b001111;
         int shortMask = (pattern >> 4) & 0b000011;
 
