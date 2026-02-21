@@ -13,6 +13,7 @@ import java.util.List;
 public class SpectrogramView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 4000f;
     private static final int MAX_HISTORY_COLUMNS = 1920;
+    private static final float[] NOTE_BASE_HZ = new float[] {220f, 300f, 380f, 460f, 620f, 760f};
 
     private final Paint spectrogramGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint heatPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -83,7 +84,7 @@ public class SpectrogramView extends View {
         int bins = 512;
         float[] frame = new float[bins];
 
-        float baseHz = 220f + Math.max(0, activeSoundNumber - 1) * 80f;
+        float baseHz = resolveBaseFrequency(activeSoundNumber);
         for (int bin = 0; bin < bins; bin++) {
             float hz = bin * lastSpectrumSampleRate / (2f * bins);
             float harmonic1 = gaussian(hz, baseHz, 70f);
@@ -98,6 +99,15 @@ public class SpectrogramView extends View {
         if (spectrumHistory.size() > MAX_HISTORY_COLUMNS) {
             spectrumHistory.remove(0);
         }
+    }
+
+
+    private float resolveBaseFrequency(int soundNumber) {
+        if (soundNumber <= 0) {
+            return NOTE_BASE_HZ[0];
+        }
+        int index = Math.min(NOTE_BASE_HZ.length - 1, soundNumber - 1);
+        return NOTE_BASE_HZ[index];
     }
 
     private float gaussian(float x, float center, float sigma) {

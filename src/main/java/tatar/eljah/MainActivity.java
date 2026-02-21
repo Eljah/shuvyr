@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                     ? ShuvyrGameView.DisplayMode.SCHEMATIC
                     : ShuvyrGameView.DisplayMode.NORMAL;
                 gameView.setDisplayMode(displayMode);
+                stopAllSoundsImmediately();
                 updateModeUi();
                 renderSoundState();
             }
@@ -100,6 +101,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
         if (!airOn) {
             spectrogramView.setAirOn(false);
+            stopAllSoundsImmediately();
             return;
         }
 
