@@ -2,6 +2,7 @@ package tatar.eljah;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.audiofx.Visualizer;
 import android.os.Build;
@@ -267,7 +268,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         stopSpectroAssist();
         spectroAssistMode = SpectroAssistMode.TUNING_MIC;
         stopAllSoundsImmediately();
-        spectrogramView.setAirOn(false);
+        spectrogramView.stopSyntheticFeedPreservingHistory();
         spectrogramView.setExternalFeedEnabled(true);
         pitchAnalyzer.startRealtimePitch(new PitchAnalyzer.PitchListener() {
             @Override
@@ -301,17 +302,23 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         stopSpectroAssist();
         spectroAssistMode = SpectroAssistMode.DEMO;
         stopAllSoundsImmediately();
-        spectrogramView.setAirOn(false);
+        spectrogramView.stopSyntheticFeedPreservingHistory();
 
-        demoPlayer = MediaPlayer.create(this, R.raw.demo_long);
-        if (demoPlayer == null) {
-            demoPlayer = MediaPlayer.create(this, R.raw.demo);
-        }
+        demoPlayer = MediaPlayer.create(this, R.raw.demo);
         if (demoPlayer == null) {
             stopSpectroAssist();
             updateSpectroAssistUi();
             renderSoundState();
             return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            demoPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build());
+        } else {
+            demoPlayer.setAudioStreamType(android.media.AudioManager.STREAM_MUSIC);
         }
 
         demoPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
@@ -425,6 +432,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         stopDemoMode();
         spectroAssistMode = SpectroAssistMode.OFF;
         spectrogramView.setExternalFeedEnabled(false);
+        spectrogramView.stopSyntheticFeedPreservingHistory();
         gameView.setHighlightedSchematicHole(-1);
     }
 

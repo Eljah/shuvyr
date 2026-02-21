@@ -82,6 +82,11 @@ public class SpectrogramView extends View {
         }
     }
 
+    public void stopSyntheticFeedPreservingHistory() {
+        airOn = false;
+        removeCallbacks(ticker);
+    }
+
     public void pushExternalSpectrumFrame(float[] magnitudes, int sampleRate) {
         if (magnitudes == null || magnitudes.length == 0) {
             return;
