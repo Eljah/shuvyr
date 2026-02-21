@@ -369,11 +369,18 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                     if (fft == null || fft.length < 4) {
                         return;
                     }
+
                     int bins = fft.length / 2;
                     float[] magnitudes = new float[bins];
+
+                    magnitudes[0] = Math.abs(fft[0]);
+                    if (bins > 1) {
+                        magnitudes[1] = Math.abs(fft[1]);
+                    }
+
                     float bestMag = 0f;
                     int bestBin = 1;
-                    for (int i = 1; i < bins; i++) {
+                    for (int i = 1; i < bins - 1; i++) {
                         int idx = i * 2;
                         if (idx + 1 >= fft.length) {
                             break;
@@ -387,7 +394,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                             bestBin = i;
                         }
                     }
-                    final int sr = samplingRate > 0 ? samplingRate : 44100;
+
+                    final int sr = samplingRate > 0 ? (samplingRate / 1000) : 44100;
                     final float[] frame = magnitudes;
                     final float hz = bestBin * (sr / 2f) / Math.max(1, bins);
                     final int note = nearestSoundNumber(hz);
