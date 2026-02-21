@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">oitavo</string>
     <string name="hint_duration_sixteenth">décimo sexto</string>
     <string name="hint_duration_unknown">desconhecido</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>

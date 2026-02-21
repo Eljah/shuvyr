@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">thứ tám</string>
     <string name="hint_duration_sixteenth">thứ mười sáu</string>
     <string name="hint_duration_unknown">không rõ</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>
