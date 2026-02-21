@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">第八</string>
     <string name="hint_duration_sixteenth">第十六</string>
     <string name="hint_duration_unknown">未知</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>

@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">восьмая</string>
     <string name="hint_duration_sixteenth">шестнадцатая</string>
     <string name="hint_duration_unknown">неизвестно</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>
