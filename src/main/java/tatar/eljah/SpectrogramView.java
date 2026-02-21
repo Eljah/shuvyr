@@ -12,7 +12,9 @@ import java.util.List;
 
 public class SpectrogramView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 4000f;
-    private static final int MAX_HISTORY_COLUMNS = 1920;
+    private static final long FRAME_INTERVAL_MS = 45L;
+    private static final int HISTORY_WINDOW_SECONDS = 120;
+    private static final int MAX_HISTORY_COLUMNS = (int) ((HISTORY_WINDOW_SECONDS * 1000L) / FRAME_INTERVAL_MS);
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
 
     private final Paint spectrogramGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -33,7 +35,7 @@ public class SpectrogramView extends View {
             }
             pushSyntheticSpectrumFrame();
             postInvalidateOnAnimation();
-            postDelayed(this, 45L);
+            postDelayed(this, FRAME_INTERVAL_MS);
         }
     };
 
@@ -96,7 +98,7 @@ public class SpectrogramView extends View {
 
         phase += 0.23f;
         spectrumHistory.add(frame);
-        if (spectrumHistory.size() > MAX_HISTORY_COLUMNS) {
+        while (spectrumHistory.size() > MAX_HISTORY_COLUMNS) {
             spectrumHistory.remove(0);
         }
     }
