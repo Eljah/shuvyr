@@ -29,6 +29,7 @@ public class ShuvyrGameView extends View {
     private final boolean[] closed = new boolean[HOLE_COUNT];
 
     private OnFingeringChangeListener listener;
+    private boolean schematicMode;
 
     public ShuvyrGameView(Context context) {
         super(context);
@@ -47,6 +48,11 @@ public class ShuvyrGameView extends View {
 
     public void setOnFingeringChangeListener(OnFingeringChangeListener listener) {
         this.listener = listener;
+    }
+
+    public void setSchematicMode(boolean schematicMode) {
+        this.schematicMode = schematicMode;
+        invalidate();
     }
 
     private void init() {
@@ -88,33 +94,32 @@ public class ShuvyrGameView extends View {
     private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
         float radius = pipe.width() * 0.15f;
-        float touchRadius = radius * 2.0f;
+        float touchHalf = pipe.width() * 0.48f;
         float startY = pipe.top + pipe.height() * 0.16f;
         float step = pipe.height() * 0.18f;
 
         for (int i = 0; i < LONG_PIPE_HOLES; i++) {
             float cy = startY + i * step;
-            drawHole(canvas, cx, cy, radius, touchRadius, offset + i);
+            drawHole(canvas, cx, cy, radius, touchHalf, offset + i);
         }
     }
 
     private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
         float radius = pipe.width() * 0.15f;
-        float touchRadius = radius * 2.0f;
+        float touchHalf = pipe.width() * 0.48f;
 
         float startY = pipe.top + pipe.height() * 0.16f;
         float step = pipe.height() * 0.18f;
-        // Те же интервалы между дырками, что и на длинной трубке.
         float y1 = startY + step * 3f;
         float y2 = y1 + step;
 
-        drawHole(canvas, cx, y1, radius, touchRadius, offset);
-        drawHole(canvas, cx, y2, radius, touchRadius, offset + 1);
+        drawHole(canvas, cx, y1, radius, touchHalf, offset);
+        drawHole(canvas, cx, y2, radius, touchHalf, offset + 1);
     }
 
-    private void drawHole(Canvas canvas, float x, float y, float radius, float touchRadius, int holeIndex) {
-        RectF holeArea = new RectF(x - touchRadius, y - touchRadius, x + touchRadius, y + touchRadius);
+    private void drawHole(Canvas canvas, float x, float y, float radius, float touchHalf, int holeIndex) {
+        RectF holeArea = new RectF(x - touchHalf, y - touchHalf, x + touchHalf, y + touchHalf);
         holeAreas.add(holeArea);
         canvas.drawCircle(x, y, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
         canvas.drawCircle(x, y, radius, borderPaint);
@@ -145,7 +150,11 @@ public class ShuvyrGameView extends View {
                 float y = event.getY(i);
                 for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
                     if (holeAreas.get(holeIndex).contains(x, y)) {
-                        nextState[holeIndex] = true;
+                        if (schematicMode) {
+                            applySchematicPress(nextState, holeIndex);
+                        } else {
+                            nextState[holeIndex] = true;
+                        }
                     }
                 }
             }
@@ -174,5 +183,22 @@ public class ShuvyrGameView extends View {
         }
 
         return true;
+    }
+
+    private void applySchematicPress(boolean[] state, int holeIndex) {
+        if (holeIndex < LONG_PIPE_HOLES) {
+            for (int i = 0; i <= holeIndex; i++) {
+                state[i] = true;
+            }
+            return;
+        }
+
+        for (int i = 0; i < LONG_PIPE_HOLES; i++) {
+            state[i] = true;
+        }
+        int shortIndex = holeIndex - LONG_PIPE_HOLES;
+        for (int i = 0; i <= shortIndex; i++) {
+            state[LONG_PIPE_HOLES + i] = true;
+        }
     }
 }

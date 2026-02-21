@@ -2,6 +2,9 @@ package tatar.eljah;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import tatar.eljah.shuvyr.R;
@@ -14,6 +17,14 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private int releasingSoundNumber = -1;
 
     private TextView noteLabel;
+    private ShuvyrGameView gameView;
+    private SpectrumView spectrumView;
+    private Button modeButton;
+
+    private boolean schematicMode;
+    private boolean forceZeroSound;
+    private int lastPattern;
+    private int lastClosedCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,7 +32,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         setContentView(R.layout.activity_main);
 
         noteLabel = findViewById(R.id.current_note_label);
-        ShuvyrGameView gameView = findViewById(R.id.shuvyr_view);
+        gameView = findViewById(R.id.shuvyr_view);
+        spectrumView = findViewById(R.id.spectrum_view);
+        modeButton = findViewById(R.id.mode_button);
+        ImageButton lipsButton = findViewById(R.id.lips_button);
+
         gameView.setOnFingeringChangeListener(this);
 
         int[] resources = new int[] {
@@ -33,18 +48,51 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             R.raw.shuvyr_6
         };
 
-        // Тайминги найденных фронтов (сек): конец атаки и начало заднего фронта.
         float[] attackEnd = new float[] {0.28f, 0.32f, 0.24f, 0.25f, 0.32f, 0.20f};
         float[] releaseStart = new float[] {2.62f, 2.83f, 2.41f, 2.47f, 2.34f, 2.69f};
 
         for (int i = 0; i < resources.length; i++) {
             players[i] = new SustainedWavPlayer(this, resources[i], attackEnd[i], releaseStart[i]);
         }
+
+        modeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                schematicMode = !schematicMode;
+                gameView.setSchematicMode(schematicMode);
+                modeButton.setText(schematicMode ? "Схема ON" : "Схема OFF");
+                spectrumView.setVisibility(schematicMode ? View.VISIBLE : View.GONE);
+            }
+        });
+
+        lipsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                forceZeroSound = !forceZeroSound;
+                if (!forceZeroSound) {
+                    onFingeringChanged(lastClosedCount, lastPattern);
+                    return;
+                }
+                startSound(1, lastClosedCount);
+            }
+        });
     }
 
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
+        lastClosedCount = closedCount;
+        lastPattern = pattern;
+
+        if (forceZeroSound) {
+            startSound(1, closedCount);
+            return;
+        }
+
         int soundNumber = mapPatternToSoundNumber(pattern);
+        startSound(soundNumber, closedCount);
+    }
+
+    private void startSound(int soundNumber, int closedCount) {
         noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
 
         if (soundNumber == activeSoundNumber) {
@@ -57,11 +105,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         SustainedWavPlayer next = players[soundNumber - 1];
         next.playSustain();
         activeSoundNumber = soundNumber;
+        spectrumView.setSoundNumber(soundNumber);
     }
 
     private int mapPatternToSoundNumber(int pattern) {
-        // Эффективное зажатие: учитывается только непрерывный префикс от первой дырки.
-        // Индексы: long L1..L4 => bits 0..3, short R1..R2 => bits 4..5.
         int longMask = pattern & 0b001111;
         int shortMask = (pattern >> 4) & 0b000011;
 
@@ -73,6 +120,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                 break;
             }
         }
+        return Math.min(SOUND_COUNT, 4 + shortClosed);
+    }
 
         int shortClosed = 0;
         if (longClosed == 4) {
@@ -85,7 +134,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             }
         }
 
-        // 1ст: 0 зажатий; 2..4ст: 1..3 на длинной; 5ст: 4+1; 6ст: 4+2.
         if (longClosed < 4) {
             return longClosed + 1;
         }
@@ -107,6 +155,22 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
         players[releasingSoundNumber - 1].hardStop();
         releasingSoundNumber = -1;
+    }
+
+    private void stopAllNow() {
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].hardStop();
+            }
+        }
+        activeSoundNumber = -1;
+        releasingSoundNumber = -1;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopAllNow();
     }
 
     @Override
