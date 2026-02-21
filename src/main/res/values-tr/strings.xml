@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Flüiteblox</string>
+    <string name="app_name">Šüvyr</string>
     <string name="main_title">Flüiteblox</string>
     <string name="main_capture">1) Notların fotoğrafını çekin</string>
     <string name="main_library">2) Eser kütüphanesi</string>
@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">sekizinci</string>
     <string name="hint_duration_sixteenth">onaltıncı</string>
     <string name="hint_duration_unknown">bilinmiyor</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>
