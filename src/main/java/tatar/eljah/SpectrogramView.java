@@ -11,15 +11,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SpectrogramView extends View {
-    private static final float MAX_SPECTROGRAM_HZ = 2000f;
-    private static final int MAX_HISTORY_COLUMNS = 240;
+    private static final float MAX_SPECTROGRAM_HZ = 4000f;
+    private static final int MAX_HISTORY_COLUMNS = 1920;
 
     private final Paint spectrogramGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint heatPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<float[]> spectrumHistory = new ArrayList<float[]>();
 
-    private int lastSpectrumSampleRate = 22050;
+    private int lastSpectrumSampleRate = 44100;
     private int activeSoundNumber = 0;
     private boolean airOn = false;
     private float phase = 0f;
@@ -80,7 +80,7 @@ public class SpectrogramView extends View {
     }
 
     private void pushSyntheticSpectrumFrame() {
-        int bins = 64;
+        int bins = 512;
         float[] frame = new float[bins];
 
         float baseHz = 220f + Math.max(0, activeSoundNumber - 1) * 80f;

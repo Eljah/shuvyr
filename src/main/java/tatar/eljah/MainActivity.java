@@ -2,7 +2,6 @@ package tatar.eljah;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -58,23 +57,15 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
     private void bindUiActions() {
         final ImageButton lipsButton = findViewById(R.id.lips_button);
-        lipsButton.setOnTouchListener(new View.OnTouchListener() {
+        lipsButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    airOn = true;
-                    renderSoundState();
-                    return true;
-                }
-                if (event.getActionMasked() == MotionEvent.ACTION_UP
-                    || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    airOn = false;
-                    renderSoundState();
-                    return true;
-                }
-                return false;
+            public void onClick(View v) {
+                airOn = !airOn;
+                lipsButton.setAlpha(airOn ? 1.0f : 0.55f);
+                renderSoundState();
             }
         });
+        lipsButton.setAlpha(0.55f);
 
         modeToggle.setOnClickListener(new View.OnClickListener() {
             @Override

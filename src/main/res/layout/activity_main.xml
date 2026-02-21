@@ -1,75 +1,54 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
     android:background="#101610">
 
-    <TextView
-        android:id="@+id/title"
+    <tatar.eljah.ShuvyrGameView
+        android:id="@+id/shuvyr_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/main_title"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#F8F2E8"
-        android:gravity="center" />
+        android:layout_height="match_parent" />
+
+    <tatar.eljah.SpectrogramView
+        android:id="@+id/spectrogram_view"
+        android:layout_width="match_parent"
+        android:layout_height="170dp"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
 
     <TextView
-        android:id="@+id/subtitle"
-        android:layout_width="match_parent"
+        android:id="@+id/current_note_label"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/main_hint"
-        android:textColor="#D0D0D0"
-        android:gravity="center" />
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="10dp"
+        android:background="#55202720"
+        android:paddingLeft="12dp"
+        android:paddingTop="6dp"
+        android:paddingRight="12dp"
+        android:paddingBottom="6dp"
+        android:text="@string/current_note_placeholder"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="18sp" />
 
     <Button
         android:id="@+id/mode_toggle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="8dp"
         android:text="@string/main_mode_normal" />
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="12dp">
+    <ImageButton
+        android:id="@+id/lips_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="8dp"
+        android:background="#55303A2E"
+        android:contentDescription="@string/main_lips_button"
+        android:padding="10dp"
+        android:src="@drawable/ic_lips"
+        android:tint="@android:color/white" />
 
-        <tatar.eljah.ShuvyrGameView
-            android:id="@+id/shuvyr_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <ImageButton
-            android:id="@+id/lips_button"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_gravity="end|center_vertical"
-            android:layout_marginEnd="6dp"
-            android:background="#55303A2E"
-            android:contentDescription="@string/main_lips_button"
-            android:padding="10dp"
-            android:src="@drawable/ic_lips"
-            android:tint="@android:color/white" />
-    </FrameLayout>
-
-    <tatar.eljah.SpectrogramView
-        android:id="@+id/spectrogram_view"
-        android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:layout_marginTop="8dp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/current_note_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/current_note_placeholder"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:textSize="18sp" />
-</LinearLayout>
+</FrameLayout>
