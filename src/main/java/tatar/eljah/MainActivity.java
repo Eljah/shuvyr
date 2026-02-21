@@ -1,30 +1,30 @@
 package tatar.eljah;
 
-import android.media.AudioAttributes;
-import android.media.SoundPool;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
-
 
 import tatar.eljah.shuvyr.R;
 
 public class MainActivity extends AppCompatActivity implements ShuvyrGameView.OnFingeringChangeListener {
-    private static final long FADE_DURATION_MS = 140;
-    private static final long FADE_FRAME_MS = 16;
+    private static final int SOUND_COUNT = 6;
 
-    private SoundPool soundPool;
-    private int sampleId;
-    private boolean sampleLoaded;
-
-    private int activeStreamId;
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private Runnable fadeRunnable;
+    private final SustainedWavPlayer[] players = new SustainedWavPlayer[SOUND_COUNT];
+    private int activeSoundNumber = -1;
+    private int releasingSoundNumber = -1;
 
     private TextView noteLabel;
+    private ShuvyrGameView gameView;
+    private SpectrumView spectrumView;
+    private Button modeButton;
+
+    private boolean schematicMode;
+    private boolean forceZeroSound;
+    private int lastPattern;
+    private int lastClosedCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,101 +32,152 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         setContentView(R.layout.activity_main);
 
         noteLabel = findViewById(R.id.current_note_label);
-        ShuvyrGameView gameView = findViewById(R.id.shuvyr_view);
+        gameView = findViewById(R.id.shuvyr_view);
+        spectrumView = findViewById(R.id.spectrum_view);
+        modeButton = findViewById(R.id.mode_button);
+        ImageButton lipsButton = findViewById(R.id.lips_button);
+
         gameView.setOnFingeringChangeListener(this);
 
-        soundPool = createSoundPool();
-        sampleId = soundPool.load(this, R.raw.ma1, 1);
-        soundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
+        int[] resources = new int[] {
+            R.raw.shuvyr_1,
+            R.raw.shuvyr_2,
+            R.raw.shuvyr_3,
+            R.raw.shuvyr_4,
+            R.raw.shuvyr_5,
+            R.raw.shuvyr_6
+        };
+
+        float[] attackEnd = new float[] {0.28f, 0.32f, 0.24f, 0.25f, 0.32f, 0.20f};
+        float[] releaseStart = new float[] {2.62f, 2.83f, 2.41f, 2.47f, 2.34f, 2.69f};
+
+        for (int i = 0; i < resources.length; i++) {
+            players[i] = new SustainedWavPlayer(this, resources[i], attackEnd[i], releaseStart[i]);
+        }
+
+        modeButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onLoadComplete(SoundPool soundPool, int sample, int status) {
-                sampleLoaded = (sample == sampleId && status == 0);
+            public void onClick(View v) {
+                schematicMode = !schematicMode;
+                gameView.setSchematicMode(schematicMode);
+                modeButton.setText(schematicMode ? "Схема ON" : "Схема OFF");
+                spectrumView.setVisibility(schematicMode ? View.VISIBLE : View.GONE);
+            }
+        });
+
+        lipsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                forceZeroSound = !forceZeroSound;
+                if (!forceZeroSound) {
+                    onFingeringChanged(lastClosedCount, lastPattern);
+                    return;
+                }
+                startSound(1, lastClosedCount);
             }
         });
     }
 
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
-        String note = mapPatternToNote(pattern);
-        noteLabel.setText(getString(R.string.current_note_template, note, closedCount));
+        lastClosedCount = closedCount;
+        lastPattern = pattern;
 
-        if (!sampleLoaded) {
+        if (forceZeroSound) {
+            startSound(1, closedCount);
             return;
         }
 
-        float targetRate = mapPatternToRate(pattern);
-        crossfadeToRate(targetRate);
+        int soundNumber = mapPatternToSoundNumber(pattern);
+        startSound(soundNumber, closedCount);
     }
 
-    private float mapPatternToRate(int pattern) {
-        int normalized = Math.max(0, Math.min(63, pattern));
-        return 0.62f + (normalized / 63f) * 1.28f;
-    }
+    private void startSound(int soundNumber, int closedCount) {
+        noteLabel.setText(getString(R.string.current_note_template, String.valueOf(soundNumber), closedCount));
 
-    private String mapPatternToNote(int pattern) {
-        String[] notes = {"G", "A", "B", "C", "D", "E", "F#", "G2"};
-        return notes[Math.abs(pattern) % notes.length];
-    }
-
-    private void crossfadeToRate(final float targetRate) {
-        if (activeStreamId == 0) {
-            activeStreamId = soundPool.play(sampleId, 1f, 1f, 1, -1, targetRate);
+        if (soundNumber == activeSoundNumber) {
             return;
         }
 
-        final int oldStream = activeStreamId;
-        final int newStream = soundPool.play(sampleId, 0f, 0f, 2, -1, targetRate);
-        if (newStream == 0) {
-            soundPool.setRate(oldStream, targetRate);
-            return;
+        stopPreviousReleaseIfAny();
+        moveActiveToRelease();
+
+        SustainedWavPlayer next = players[soundNumber - 1];
+        next.playSustain();
+        activeSoundNumber = soundNumber;
+        spectrumView.setSoundNumber(soundNumber);
+    }
+
+    private int mapPatternToSoundNumber(int pattern) {
+        int longMask = pattern & 0b001111;
+        int shortMask = (pattern >> 4) & 0b000011;
+
+        int longClosed = 0;
+        for (int i = 0; i < 4; i++) {
+            if ((longMask & (1 << i)) != 0) {
+                longClosed++;
+            } else {
+                break;
+            }
         }
 
-        activeStreamId = newStream;
-        if (fadeRunnable != null) {
-            handler.removeCallbacks(fadeRunnable);
-        }
-
-        final long start = System.currentTimeMillis();
-        fadeRunnable = new Runnable() {
-            @Override
-            public void run() {
-                float t = (System.currentTimeMillis() - start) / (float) FADE_DURATION_MS;
-                t = Math.max(0f, Math.min(1f, t));
-                float in = t;
-                float out = 1f - t;
-                soundPool.setVolume(newStream, in, in);
-                soundPool.setVolume(oldStream, out, out);
-
-                if (t < 1f) {
-                    handler.postDelayed(this, FADE_FRAME_MS);
+        int shortClosed = 0;
+        if (longClosed == 4) {
+            for (int i = 0; i < 2; i++) {
+                if ((shortMask & (1 << i)) != 0) {
+                    shortClosed++;
                 } else {
-                    soundPool.stop(oldStream);
+                    break;
                 }
             }
-        };
-        handler.post(fadeRunnable);
+        }
+
+        if (longClosed < 4) {
+            return longClosed + 1;
+        }
+        return Math.min(SOUND_COUNT, 4 + shortClosed);
     }
 
-    private SoundPool createSoundPool() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build();
-            return new SoundPool.Builder()
-                .setMaxStreams(4)
-                .setAudioAttributes(audioAttributes)
-                .build();
+    private void moveActiveToRelease() {
+        if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
+            return;
         }
-        return new SoundPool(4, android.media.AudioManager.STREAM_MUSIC, 0);
+        SustainedWavPlayer active = players[activeSoundNumber - 1];
+        active.stopWithRelease();
+        releasingSoundNumber = activeSoundNumber;
+    }
+
+    private void stopPreviousReleaseIfAny() {
+        if (releasingSoundNumber < 1 || releasingSoundNumber > SOUND_COUNT) {
+            return;
+        }
+        players[releasingSoundNumber - 1].hardStop();
+        releasingSoundNumber = -1;
+    }
+
+    private void stopAllNow() {
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].hardStop();
+            }
+        }
+        activeSoundNumber = -1;
+        releasingSoundNumber = -1;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopAllNow();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        handler.removeCallbacksAndMessages(null);
-        if (soundPool != null) {
-            soundPool.release();
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] != null) {
+                players[i].release();
+            }
         }
     }
 }
