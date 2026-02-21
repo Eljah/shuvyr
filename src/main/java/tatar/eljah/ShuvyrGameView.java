@@ -159,7 +159,9 @@ public class ShuvyrGameView extends View {
         float shortStartY = shortPipe.top + shortPipe.height() * 0.16f;
         float shortStep = shortPipe.height() * 0.18f;
         float shortY1 = shortStartY + shortStep * 3f;
+        float shortY2 = shortY1 + shortStep;
         drawHole(canvas, shortPipe.centerX(), shortY1, holeRadius, touchHalf, LONG_PIPE_HOLES);
+        drawHole(canvas, shortPipe.centerX(), shortY2, holeRadius, touchHalf, LONG_PIPE_HOLES + 1);
     }
 
     private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset, float radius, float touchHalf) {
@@ -254,7 +256,7 @@ public class ShuvyrGameView extends View {
                 }
             }
             if (selectedHole >= 0) {
-                for (int i = 0; i <= selectedHole && i < LONG_PIPE_HOLES + 1; i++) {
+                for (int i = 0; i <= selectedHole && i < HOLE_COUNT; i++) {
                     nextState[i] = true;
                 }
             }

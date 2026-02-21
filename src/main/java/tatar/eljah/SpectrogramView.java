@@ -146,11 +146,14 @@ public class SpectrogramView extends View {
         if (spectrumHistory.isEmpty()) {
             return;
         }
-        int columns = spectrumHistory.size();
-        float colW = Math.max(1f, w / Math.max(1, columns));
 
-        for (int x = 0; x < columns; x++) {
-            float[] frame = spectrumHistory.get(x);
+        int columns = spectrumHistory.size();
+        int visibleColumns = Math.max(1, Math.min(columns, (int) Math.ceil(w)));
+        int firstVisibleColumn = Math.max(0, columns - visibleColumns);
+        float colW = w / visibleColumns;
+
+        for (int x = 0; x < visibleColumns; x++) {
+            float[] frame = spectrumHistory.get(firstVisibleColumn + x);
             if (frame == null || frame.length == 0) {
                 continue;
             }
