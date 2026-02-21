@@ -14,7 +14,7 @@ import java.util.Locale;
 public class SpectrogramView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 4000f;
     private static final long FRAME_INTERVAL_MS = 45L;
-    private static final int HISTORY_WINDOW_SECONDS = 120;
+    private static final int HISTORY_WINDOW_SECONDS = 30;
     private static final int MAX_HISTORY_COLUMNS = (int) ((HISTORY_WINDOW_SECONDS * 1000L) / FRAME_INTERVAL_MS);
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
     private static final float PLOT_LEFT_PADDING_PX = 64f;
