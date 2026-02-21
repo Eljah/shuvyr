@@ -154,7 +154,7 @@ public class ShuvyrGameView extends View {
 
     private void drawLongPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
-        float radius = pipe.width() * 0.13f;
+        float radius = pipe.width() * 0.42f;
         float touchHalf = pipe.width() * 0.56f;
         float startY = pipe.top + pipe.height() * 0.16f;
         float step = pipe.height() * 0.18f;
@@ -167,7 +167,7 @@ public class ShuvyrGameView extends View {
 
     private void drawShortPipeHoles(Canvas canvas, RectF pipe, int offset) {
         float cx = pipe.centerX();
-        float radius = pipe.width() * 0.13f;
+        float radius = pipe.width() * 0.42f;
         float touchHalf = pipe.width() * 0.56f;
 
         float startY = pipe.top + pipe.height() * 0.16f;

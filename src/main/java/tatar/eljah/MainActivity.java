@@ -127,6 +127,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private int mapPatternToSoundNumber(int pattern) {
+        if (pattern == (1 << 3) || pattern == (1 << 4)) {
+            return 5;
+        }
+
         int longMask = pattern & 0b001111;
         int shortMask = (pattern >> 4) & 0b000011;
 
