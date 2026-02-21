@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Shuvyr</string>
+    <string name="app_name">Šüvyr</string>
     <string name="main_title">Shuvyr</string>
     <string name="main_capture">1) Prenez une photo des notes</string>
     <string name="main_library">2) Bibliothèque d\'ouvrages</string>
@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">huitième</string>
     <string name="hint_duration_sixteenth">seizième</string>
     <string name="hint_duration_unknown">inconnu</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>

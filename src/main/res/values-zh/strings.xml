@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">氟莱特布洛克斯</string>
+    <string name="app_name">Šüvyr</string>
     <string name="main_title">氟莱特布洛克斯</string>
     <string name="main_capture">1）给笔记拍照</string>
     <string name="main_library">2）作品库</string>
@@ -78,4 +78,6 @@
     <string name="hint_duration_eighth">第八</string>
     <string name="hint_duration_sixteenth">第十六</string>
     <string name="hint_duration_unknown">未知</string>
+    <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
+    <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
 </resources>

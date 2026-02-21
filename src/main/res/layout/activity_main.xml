@@ -24,6 +24,30 @@
         android:orientation="horizontal">
 
         <ImageButton
+            android:id="@+id/spectro_tune_toggle"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:background="#55303A2E"
+            android:contentDescription="@string/main_spectro_tune_mode"
+            android:padding="8dp"
+            android:src="@drawable/ic_mode_tuner"
+            android:tint="@android:color/white"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/spectro_demo_toggle"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:background="#55303A2E"
+            android:contentDescription="@string/main_spectro_demo_mode"
+            android:padding="8dp"
+            android:src="@drawable/ic_mode_demo"
+            android:tint="@android:color/white"
+            android:visibility="gone" />
+
+        <ImageButton
             android:id="@+id/mode_toggle"
             android:layout_width="44dp"
             android:layout_height="44dp"
