@@ -55,6 +55,9 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             @Override
             public void onClick(View v) {
                 airOn = !airOn;
+                if (!airOn) {
+                    stopAirWithRelease();
+                }
                 lipsButton.setAlpha(airOn ? 1.0f : 0.55f);
                 renderSoundState();
             }
@@ -96,7 +99,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         int soundNumber = mapPatternToSoundNumber(lastPattern);
 
         if (!airOn) {
-            stopAirWithRelease();
             spectrogramView.setAirOn(false);
             return;
         }
