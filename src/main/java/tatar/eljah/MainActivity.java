@@ -380,7 +380,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
                     float bestMag = 0f;
                     int bestBin = 1;
-                    for (int i = 1; i < bins - 1; i++) {
+                    for (int i = 1; i < bins; i++) {
                         int idx = i * 2;
                         if (idx + 1 >= fft.length) {
                             break;
