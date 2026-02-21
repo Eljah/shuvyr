@@ -31,11 +31,12 @@ public class SpectrogramView extends View {
     private int activeSoundNumber = 0;
     private boolean airOn = false;
     private float phase = 0f;
+    private boolean externalFeedEnabled = false;
 
     private final Runnable ticker = new Runnable() {
         @Override
         public void run() {
-            if (!airOn) {
+            if (!airOn || externalFeedEnabled) {
                 return;
             }
             pushSyntheticSpectrumFrame();
@@ -73,7 +74,32 @@ public class SpectrogramView extends View {
         activeSoundNumber = Math.max(0, soundNumber);
     }
 
+    public void setExternalFeedEnabled(boolean enabled) {
+        externalFeedEnabled = enabled;
+        if (enabled) {
+            removeCallbacks(ticker);
+            airOn = false;
+        }
+    }
+
+    public void pushExternalSpectrumFrame(float[] magnitudes, int sampleRate) {
+        if (magnitudes == null || magnitudes.length == 0) {
+            return;
+        }
+        lastSpectrumSampleRate = sampleRate > 0 ? sampleRate : lastSpectrumSampleRate;
+        float[] copy = new float[magnitudes.length];
+        System.arraycopy(magnitudes, 0, copy, 0, magnitudes.length);
+        spectrumHistory.add(copy);
+        while (spectrumHistory.size() > MAX_HISTORY_COLUMNS) {
+            spectrumHistory.remove(0);
+        }
+        postInvalidateOnAnimation();
+    }
+
     public void setAirOn(boolean enabled) {
+        if (externalFeedEnabled) {
+            return;
+        }
         if (airOn == enabled) {
             return;
         }

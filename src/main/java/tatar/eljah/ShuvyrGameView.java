@@ -35,12 +35,14 @@ public class ShuvyrGameView extends View {
     private final Paint holeOpenPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint holeClosedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint touchGuidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<RectF> holeAreas = new ArrayList<RectF>();
     private final boolean[] closed = new boolean[HOLE_COUNT];
 
     private OnFingeringChangeListener listener;
     private DisplayMode displayMode = DisplayMode.NORMAL;
     private int bottomInsetPx = 0;
+    private int highlightedSchematicHole = -1;
 
     public ShuvyrGameView(Context context) {
         super(context);
@@ -66,7 +68,18 @@ public class ShuvyrGameView extends View {
             return;
         }
         displayMode = mode;
+        highlightedSchematicHole = -1;
         clearFingering();
+        invalidate();
+    }
+
+
+    public void setHighlightedSchematicHole(int holeIndex) {
+        int next = (holeIndex >= 0 && holeIndex < HOLE_COUNT) ? holeIndex : -1;
+        if (highlightedSchematicHole == next) {
+            return;
+        }
+        highlightedSchematicHole = next;
         invalidate();
     }
 
@@ -89,6 +102,8 @@ public class ShuvyrGameView extends View {
         touchGuidePaint.setColor(Color.parseColor("#66CC66"));
         touchGuidePaint.setStyle(Paint.Style.STROKE);
         touchGuidePaint.setStrokeWidth(1.5f);
+        highlightPaint.setColor(Color.parseColor("#C62828"));
+        highlightPaint.setStyle(Paint.Style.FILL);
         setBackgroundColor(Color.parseColor("#1A231A"));
     }
 
@@ -223,7 +238,11 @@ public class ShuvyrGameView extends View {
         if (showGuide) {
             canvas.drawRect(holeArea, touchGuidePaint);
         }
-        canvas.drawCircle(x, y, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
+        if (displayMode == DisplayMode.SCHEMATIC && holeIndex == highlightedSchematicHole) {
+            canvas.drawCircle(x, y, radius, highlightPaint);
+        } else {
+            canvas.drawCircle(x, y, radius, closed[holeIndex] ? holeClosedPaint : holeOpenPaint);
+        }
         canvas.drawCircle(x, y, radius, borderPaint);
     }
 
