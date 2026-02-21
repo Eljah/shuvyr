@@ -105,6 +105,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private void playSound(int soundNumber, String shownNote) {
+        int closedCount = countClosed(lastPattern);
+        noteLabel.setText(getString(R.string.current_note_template, shownNote, closedCount));
+        spectrogramView.setActiveSoundNumber(soundNumber);
+
         if (soundNumber == activeSoundNumber) {
             return;
         }
@@ -114,10 +118,6 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         SustainedWavPlayer next = players[soundNumber - 1];
         next.playSustain();
         activeSoundNumber = soundNumber;
-        spectrogramView.setActiveSoundNumber(soundNumber);
-
-        int closedCount = countClosed(lastPattern);
-        noteLabel.setText(getString(R.string.current_note_template, shownNote, closedCount));
     }
 
     private int countClosed(int pattern) {

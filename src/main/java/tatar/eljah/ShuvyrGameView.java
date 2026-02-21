@@ -127,7 +127,8 @@ public class ShuvyrGameView extends View {
         float radius = schematicPipe.width() * 0.13f;
         float startY = schematicPipe.top + schematicPipe.height() * 0.12f;
         float step = schematicPipe.height() * 0.14f;
-        float touchHalf = schematicPipe.width() * 0.50f;
+        // Делаем зоны достаточно большими для удобства, но без сильного перекрытия.
+        float touchHalf = Math.min(schematicPipe.width() * 0.36f, step * 0.45f);
 
         for (int i = 0; i < HOLE_COUNT; i++) {
             float cy = startY + i * step;
@@ -218,10 +219,15 @@ public class ShuvyrGameView extends View {
             float x = event.getX(0);
             float y = event.getY(0);
             int selectedHole = -1;
+            float bestDistance = Float.MAX_VALUE;
             for (int holeIndex = 0; holeIndex < holeAreas.size(); holeIndex++) {
-                if (holeAreas.get(holeIndex).contains(x, y)) {
-                    selectedHole = holeIndex;
-                    break;
+                RectF area = holeAreas.get(holeIndex);
+                if (area.contains(x, y)) {
+                    float distance = Math.abs(y - area.centerY());
+                    if (distance <= bestDistance) {
+                        bestDistance = distance;
+                        selectedHole = holeIndex;
+                    }
                 }
             }
             if (selectedHole >= 0) {
