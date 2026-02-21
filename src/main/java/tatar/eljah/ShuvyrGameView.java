@@ -36,6 +36,7 @@ public class ShuvyrGameView extends View {
 
     private OnFingeringChangeListener listener;
     private DisplayMode displayMode = DisplayMode.NORMAL;
+    private int bottomInsetPx = 0;
 
     public ShuvyrGameView(Context context) {
         super(context);
@@ -65,6 +66,15 @@ public class ShuvyrGameView extends View {
         invalidate();
     }
 
+    public void setBottomInsetPx(int insetPx) {
+        int next = Math.max(0, insetPx);
+        if (bottomInsetPx == next) {
+            return;
+        }
+        bottomInsetPx = next;
+        invalidate();
+    }
+
     private void init() {
         pipePaint.setColor(Color.parseColor("#D5B07A"));
         borderPaint.setColor(Color.parseColor("#5E4427"));
@@ -91,13 +101,15 @@ public class ShuvyrGameView extends View {
 
     private void drawNormalMode(Canvas canvas) {
         float w = getWidth();
-        float h = getHeight();
+        float h = Math.max(1f, getHeight() - bottomInsetPx);
         float pipeWidth = w * 0.24f;
-        float pipeHeight = h * 0.80f;
-        float top = h * 0.10f;
+        float pipeHeight = h * 0.82f;
+        float top = h * 0.09f;
 
-        float leftPipeLeft = w * 0.18f;
-        float rightPipeLeft = w * 0.47f;
+        float gap = pipeWidth * 0.22f;
+        float totalWidth = pipeWidth * 2f + gap;
+        float leftPipeLeft = (w - totalWidth) / 2f;
+        float rightPipeLeft = leftPipeLeft + pipeWidth + gap;
 
         RectF longPipe = new RectF(leftPipeLeft, top, leftPipeLeft + pipeWidth, top + pipeHeight);
         RectF shortPipe = new RectF(rightPipeLeft, top, rightPipeLeft + pipeWidth, top + pipeHeight);
@@ -113,7 +125,7 @@ public class ShuvyrGameView extends View {
 
     private void drawSchematicMode(Canvas canvas) {
         float w = getWidth();
-        float h = getHeight();
+        float h = Math.max(1f, getHeight() - bottomInsetPx);
         float pipeWidth = w * 0.30f;
         float pipeHeight = h * 0.82f;
         float left = w * 0.35f;
@@ -127,12 +139,12 @@ public class ShuvyrGameView extends View {
         float radius = schematicPipe.width() * 0.13f;
         float startY = schematicPipe.top + schematicPipe.height() * 0.12f;
         float step = schematicPipe.height() * 0.14f;
-        // Делаем зоны достаточно большими для удобства, но без сильного перекрытия.
-        float touchHalf = Math.min(schematicPipe.width() * 0.36f, step * 0.45f);
+        float touchHalfX = schematicPipe.width() * 0.45f;
+        float touchHalfY = step * 0.5f;
 
         for (int i = 0; i < HOLE_COUNT; i++) {
             float cy = startY + i * step;
-            RectF touchArea = new RectF(cx - touchHalf, cy - touchHalf, cx + touchHalf, cy + touchHalf);
+            RectF touchArea = new RectF(cx - touchHalfX, cy - touchHalfY, cx + touchHalfX, cy + touchHalfY);
             holeAreas.add(touchArea);
             canvas.drawRect(touchArea, guidePaint);
             canvas.drawCircle(cx, cy, radius, closed[i] ? holeClosedPaint : holeOpenPaint);

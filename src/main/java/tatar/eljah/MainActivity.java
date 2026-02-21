@@ -3,7 +3,6 @@ package tatar.eljah;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
@@ -21,7 +20,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private TextView noteLabel;
     private ShuvyrGameView gameView;
     private SpectrogramView spectrogramView;
-    private Button modeToggle;
+    private ImageButton modeToggle;
     private ShuvyrGameView.DisplayMode displayMode = ShuvyrGameView.DisplayMode.NORMAL;
 
     @Override
@@ -52,6 +51,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
 
         bindUiActions();
+        updateModeUi();
         renderSoundState();
     }
 
@@ -74,16 +74,24 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                     ? ShuvyrGameView.DisplayMode.SCHEMATIC
                     : ShuvyrGameView.DisplayMode.NORMAL;
                 gameView.setDisplayMode(displayMode);
-                boolean schematic = displayMode == ShuvyrGameView.DisplayMode.SCHEMATIC;
-                spectrogramView.setVisibility(schematic ? View.VISIBLE : View.GONE);
-                modeToggle.setText(schematic
-                    ? getString(R.string.main_mode_schematic)
-                    : getString(R.string.main_mode_normal));
+                updateModeUi();
                 renderSoundState();
             }
         });
     }
 
+
+    private void updateModeUi() {
+        boolean schematic = displayMode == ShuvyrGameView.DisplayMode.SCHEMATIC;
+        spectrogramView.setVisibility(schematic ? View.VISIBLE : View.GONE);
+        modeToggle.setImageResource(schematic ? R.drawable.ic_mode_bagpipe : R.drawable.ic_mode_spectrogram);
+        modeToggle.setContentDescription(getString(schematic
+            ? R.string.main_mode_schematic
+            : R.string.main_mode_normal));
+
+        final int bottomInset = schematic ? spectrogramView.getLayoutParams().height : 0;
+        gameView.setBottomInsetPx(bottomInset);
+    }
     @Override
     public void onFingeringChanged(int closedCount, int pattern) {
         lastPattern = pattern;
