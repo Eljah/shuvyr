@@ -9,6 +9,7 @@ import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class SpectrogramView extends View {
     private static final float MAX_SPECTROGRAM_HZ = 4000f;
@@ -16,6 +17,10 @@ public class SpectrogramView extends View {
     private static final int HISTORY_WINDOW_SECONDS = 120;
     private static final int MAX_HISTORY_COLUMNS = (int) ((HISTORY_WINDOW_SECONDS * 1000L) / FRAME_INTERVAL_MS);
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
+    private static final float PLOT_LEFT_PADDING_PX = 64f;
+    private static final float PLOT_RIGHT_PADDING_PX = 8f;
+    private static final float PLOT_TOP_PADDING_PX = 8f;
+    private static final float PLOT_BOTTOM_PADDING_PX = 34f;
 
     private final Paint spectrogramGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint heatPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -128,29 +133,51 @@ public class SpectrogramView extends View {
         super.onDraw(canvas);
         float w = getWidth();
         float h = getHeight();
-        drawSpectrogramGrid(canvas, w, 0f, h);
-        drawSpectrogramHeatmap(canvas, w, 0f, h);
+        float plotLeft = PLOT_LEFT_PADDING_PX;
+        float plotRight = Math.max(plotLeft + 1f, w - PLOT_RIGHT_PADDING_PX);
+        float plotTop = PLOT_TOP_PADDING_PX;
+        float plotBottom = Math.max(plotTop + 1f, h - PLOT_BOTTOM_PADDING_PX);
+        drawSpectrogramHeatmap(canvas, plotLeft, plotRight, plotTop, plotBottom);
+        drawSpectrogramGrid(canvas, plotLeft, plotRight, plotTop, plotBottom);
     }
 
-    private void drawSpectrogramGrid(Canvas canvas, float w, float top, float bottom) {
-        int gridLines = Math.max(1, (int) (MAX_SPECTROGRAM_HZ / 1000f));
-        for (int i = 0; i <= gridLines; i++) {
+    private void drawSpectrogramGrid(Canvas canvas, float left, float right, float top, float bottom) {
+        float plotWidth = Math.max(1f, right - left);
+
+        int yGridLines = Math.max(1, (int) (MAX_SPECTROGRAM_HZ / 1000f));
+        for (int i = 0; i <= yGridLines; i++) {
             float hz = i * 1000f;
             float y = yForFrequency(hz, top, bottom);
-            canvas.drawLine(0, y, w, y, spectrogramGridPaint);
-            canvas.drawText(((int) hz) + " Hz", 8f, y - 4f, labelPaint);
+            canvas.drawLine(left, y, right, y, spectrogramGridPaint);
+            canvas.drawText(String.format(Locale.US, "%.1f kHz", hz / 1000f), 8f, y - 4f, labelPaint);
         }
+
+        int xGridLines = 6;
+        int columns = spectrumHistory.size();
+        int visibleColumns = Math.max(1, Math.min(columns, (int) Math.ceil(plotWidth)));
+        float visibleSeconds = Math.max(1f, visibleColumns * FRAME_INTERVAL_MS / 1000f);
+        for (int i = 0; i <= xGridLines; i++) {
+            float t = i / (float) xGridLines;
+            float x = left + t * plotWidth;
+            canvas.drawLine(x, top, x, bottom, spectrogramGridPaint);
+            float sec = -visibleSeconds + t * visibleSeconds;
+            canvas.drawText(String.format(Locale.US, "%.0f s", sec), x - 14f, bottom + 24f, labelPaint);
+        }
+
+        canvas.drawLine(left, top, left, bottom, labelPaint);
+        canvas.drawLine(left, bottom, right, bottom, labelPaint);
     }
 
-    private void drawSpectrogramHeatmap(Canvas canvas, float w, float top, float bottom) {
+    private void drawSpectrogramHeatmap(Canvas canvas, float left, float right, float top, float bottom) {
         if (spectrumHistory.isEmpty()) {
             return;
         }
 
+        float plotWidth = Math.max(1f, right - left);
         int columns = spectrumHistory.size();
-        int visibleColumns = Math.max(1, Math.min(columns, (int) Math.ceil(w)));
+        int visibleColumns = Math.max(1, Math.min(columns, (int) Math.ceil(plotWidth)));
         int firstVisibleColumn = Math.max(0, columns - visibleColumns);
-        float colW = w / visibleColumns;
+        float colW = plotWidth / visibleColumns;
 
         for (int x = 0; x < visibleColumns; x++) {
             float[] frame = spectrumHistory.get(firstVisibleColumn + x);
@@ -173,8 +200,8 @@ public class SpectrogramView extends View {
                 float intensity = normalizeMagnitude(frame[bin], frameMax);
                 heatPaint.setColor(heatColor(intensity));
                 heatPaint.setStyle(Paint.Style.FILL);
-                float left = x * colW;
-                canvas.drawRect(left, yTop, left + colW + 1f, yBottom, heatPaint);
+                float colLeft = left + x * colW;
+                canvas.drawRect(colLeft, yTop, colLeft + colW + 1f, yBottom, heatPaint);
             }
         }
     }
