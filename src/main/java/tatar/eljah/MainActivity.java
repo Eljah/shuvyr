@@ -1,6 +1,7 @@
 package tatar.eljah;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
@@ -104,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
     private void bindUiActions() {
         final ImageButton lipsButton = findViewById(R.id.lips_button);
+        final ImageButton trainerButton = findViewById(R.id.trainer_button);
         lipsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -116,6 +118,13 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             }
         });
         lipsButton.setAlpha(0.55f);
+
+        trainerButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, MelodyTrainerActivity.class));
+            }
+        });
 
         modeToggle.setOnClickListener(new View.OnClickListener() {
             @Override
