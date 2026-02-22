@@ -22,20 +22,28 @@ public class MelodyTrainerActivity extends AppCompatActivity {
     };
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable completionReset = new Runnable() {
+        @Override
+        public void run() {
+            currentStep = 0;
+            btnPlayPause.setText(R.string.trainer_start);
+            textStatus.setText(getString(R.string.trainer_ready));
+            gameView.setHighlightedSchematicHole(-1);
+        }
+    };
+
     private final Runnable playbackStep = new Runnable() {
         @Override
         public void run() {
             showStep(currentStep);
+            int stepDurationMs = GOT_STEP_DURATION_MS[currentStep];
             currentStep++;
             if (currentStep >= GOT_SOUND_SEQUENCE.length) {
                 isPlaying = false;
-                currentStep = 0;
-                btnPlayPause.setText(R.string.trainer_start);
-                textStatus.setText(getString(R.string.trainer_ready));
-                gameView.setHighlightedSchematicHole(-1);
+                handler.postDelayed(completionReset, stepDurationMs);
                 return;
             }
-            handler.postDelayed(this, GOT_STEP_DURATION_MS[currentStep - 1]);
+            handler.postDelayed(this, stepDurationMs);
         }
     };
 
@@ -99,6 +107,8 @@ public class MelodyTrainerActivity extends AppCompatActivity {
     private void stopPlayback() {
         isPlaying = false;
         handler.removeCallbacks(playbackStep);
+        handler.removeCallbacks(completionReset);
+        currentStep = 0;
         btnPlayPause.setText(R.string.trainer_start);
         textStatus.setText(getString(R.string.trainer_ready));
         gameView.setHighlightedSchematicHole(-1);
