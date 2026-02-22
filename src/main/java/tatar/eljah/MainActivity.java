@@ -11,6 +11,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ImageButton;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
 
 import tatar.eljah.audio.PitchAnalyzer;
 import tatar.eljah.shuvyr.R;
@@ -43,6 +49,28 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private SpectroAssistMode spectroAssistMode = SpectroAssistMode.OFF;
     private MediaPlayer demoPlayer;
     private Visualizer demoVisualizer;
+    private final List<float[]> demoSpectrumFrames = new ArrayList<float[]>();
+    private final List<Integer> demoSpectrumNotes = new ArrayList<Integer>();
+    private int demoSpectrumSampleRate = 44100;
+    private int demoSpectrumFrameDurationMs = 23;
+    private int lastDemoFrameIndex = -1;
+    private final Runnable demoSpectrumTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (spectroAssistMode != SpectroAssistMode.DEMO || demoPlayer == null || demoSpectrumFrames.isEmpty()) {
+                return;
+            }
+            int frameIndex = currentDemoFrameIndex();
+            if (frameIndex != lastDemoFrameIndex && frameIndex >= 0 && frameIndex < demoSpectrumFrames.size()) {
+                lastDemoFrameIndex = frameIndex;
+                spectrogramView.pushExternalSpectrumFrame(demoSpectrumFrames.get(frameIndex), demoSpectrumSampleRate);
+                int note = demoSpectrumNotes.get(frameIndex);
+                spectrogramView.setActiveSoundNumber(note);
+                gameView.setHighlightedSchematicHole(mapSoundToHole(note));
+            }
+            spectrogramView.postDelayed(this, 16L);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,11 +185,20 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private void renderSoundState() {
-        if (spectroAssistMode != SpectroAssistMode.OFF) {
+        if (spectroAssistMode == SpectroAssistMode.DEMO) {
             return;
         }
 
         int soundNumber = mapPatternToSoundNumber(lastPattern);
+
+        if (spectroAssistMode == SpectroAssistMode.TUNING_MIC) {
+            if (!airOn) {
+                stopAllSoundsImmediately();
+                return;
+            }
+            playSound(soundNumber);
+            return;
+        }
 
         if (!airOn) {
             spectrogramView.setAirOn(false);
@@ -303,6 +340,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         spectroAssistMode = SpectroAssistMode.DEMO;
         stopAllSoundsImmediately();
         spectrogramView.stopSyntheticFeedPreservingHistory();
+        buildDemoSpectrumFrames();
 
         demoPlayer = MediaPlayer.create(this, R.raw.demo);
         if (demoPlayer == null) {
@@ -340,8 +378,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         }
 
         boolean visualizerReady = setupDemoVisualizer();
-        if (visualizerReady) {
+        if (visualizerReady || !demoSpectrumFrames.isEmpty()) {
             spectrogramView.setExternalFeedEnabled(true);
+            lastDemoFrameIndex = -1;
+            spectrogramView.removeCallbacks(demoSpectrumTicker);
+            spectrogramView.post(demoSpectrumTicker);
         } else {
             spectrogramView.setExternalFeedEnabled(false);
             spectrogramView.setActiveSoundNumber(1);
@@ -417,6 +458,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     }
 
     private void stopDemoMode() {
+        spectrogramView.removeCallbacks(demoSpectrumTicker);
+        lastDemoFrameIndex = -1;
         if (demoVisualizer != null) {
             try {
                 demoVisualizer.setEnabled(false);
@@ -433,6 +476,162 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             demoPlayer.release();
             demoPlayer = null;
         }
+    }
+
+    private int currentDemoFrameIndex() {
+        int positionMs = 0;
+        try {
+            positionMs = Math.max(0, demoPlayer.getCurrentPosition());
+        } catch (IllegalStateException ignored) {
+        }
+        int index = demoSpectrumFrameDurationMs > 0 ? (positionMs / demoSpectrumFrameDurationMs) : 0;
+        if (index >= demoSpectrumFrames.size()) {
+            return demoSpectrumFrames.size() - 1;
+        }
+        return index;
+    }
+
+    private void buildDemoSpectrumFrames() {
+        if (!demoSpectrumFrames.isEmpty()) {
+            return;
+        }
+        short[] samples = readMonoPcm16Wav(R.raw.demo);
+        if (samples == null || samples.length == 0) {
+            return;
+        }
+
+        final List<float[]> frames = new ArrayList<float[]>();
+        final List<Integer> notes = new ArrayList<Integer>();
+        final int sampleRate = demoSpectrumSampleRate;
+
+        pitchAnalyzer.analyzePcm(samples, sampleRate, new PitchAnalyzer.PitchListener() {
+            @Override
+            public void onPitch(float pitchHz) {
+                notes.add(nearestSoundNumber(pitchHz));
+            }
+        }, new PitchAnalyzer.SpectrumListener() {
+            @Override
+            public void onSpectrum(float[] magnitudes, int sampleRate) {
+                float[] copy = new float[magnitudes.length];
+                System.arraycopy(magnitudes, 0, copy, 0, magnitudes.length);
+                frames.add(copy);
+            }
+        });
+
+        if (frames.isEmpty()) {
+            return;
+        }
+
+        while (notes.size() < frames.size()) {
+            int fallback = notes.isEmpty() ? 1 : notes.get(notes.size() - 1);
+            notes.add(fallback);
+        }
+
+        demoSpectrumFrames.clear();
+        demoSpectrumFrames.addAll(frames);
+        demoSpectrumNotes.clear();
+        demoSpectrumNotes.addAll(notes);
+        demoSpectrumFrameDurationMs = Math.max(1, Math.round(512f * 1000f / sampleRate));
+    }
+
+    private short[] readMonoPcm16Wav(int resId) {
+        InputStream input = null;
+        try {
+            input = getResources().openRawResource(resId);
+            byte[] data = readAllBytes(input);
+            if (data.length < 44) {
+                return null;
+            }
+            if (!(match(data, 0, "RIFF") && match(data, 8, "WAVE"))) {
+                return null;
+            }
+
+            int offset = 12;
+            int sampleRate = 0;
+            int channels = 1;
+            int bitsPerSample = 16;
+            int dataOffset = -1;
+            int dataSize = 0;
+
+            while (offset + 8 <= data.length) {
+                int chunkSize = littleEndianInt(data, offset + 4);
+                int chunkDataOffset = offset + 8;
+                if (chunkDataOffset + chunkSize > data.length) {
+                    break;
+                }
+                if (match(data, offset, "fmt ")) {
+                    int audioFormat = littleEndianShort(data, chunkDataOffset);
+                    channels = littleEndianShort(data, chunkDataOffset + 2);
+                    sampleRate = littleEndianInt(data, chunkDataOffset + 4);
+                    bitsPerSample = littleEndianShort(data, chunkDataOffset + 14);
+                    if (audioFormat != 1) {
+                        return null;
+                    }
+                } else if (match(data, offset, "data")) {
+                    dataOffset = chunkDataOffset;
+                    dataSize = chunkSize;
+                    break;
+                }
+                offset = chunkDataOffset + chunkSize + (chunkSize % 2);
+            }
+
+            if (sampleRate <= 0 || dataOffset < 0 || bitsPerSample != 16 || dataSize <= 0) {
+                return null;
+            }
+            demoSpectrumSampleRate = sampleRate;
+
+            int frameSizeBytes = channels * 2;
+            int frames = dataSize / frameSizeBytes;
+            short[] mono = new short[frames];
+            for (int i = 0; i < frames; i++) {
+                int frameOffset = dataOffset + i * frameSizeBytes;
+                int sample = littleEndianShort(data, frameOffset);
+                mono[i] = (short) sample;
+            }
+            return mono;
+        } catch (IOException ignored) {
+            return null;
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private byte[] readAllBytes(InputStream input) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            output.write(buffer, 0, read);
+        }
+        return output.toByteArray();
+    }
+
+    private boolean match(byte[] data, int offset, String value) {
+        if (offset < 0 || offset + value.length() > data.length) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if ((byte) value.charAt(i) != data[offset + i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int littleEndianShort(byte[] data, int offset) {
+        return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8);
+    }
+
+    private int littleEndianInt(byte[] data, int offset) {
+        return (data[offset] & 0xFF)
+            | ((data[offset + 1] & 0xFF) << 8)
+            | ((data[offset + 2] & 0xFF) << 16)
+            | ((data[offset + 3] & 0xFF) << 24);
     }
 
     private void stopSpectroAssist() {
