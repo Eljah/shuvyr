@@ -124,6 +124,11 @@ public class SustainedWavPlayer {
             return new PcmData(info.sampleRate, info.channelCount, pcm);
         }
 
+        if (info.audioFormat == 1 && (info.bitsPerSample == 8 || info.bitsPerSample == 24 || info.bitsPerSample == 32)) {
+            return new PcmData(info.sampleRate, info.channelCount,
+                convertIntegerPcmTo16(wavBytes, info.dataOffset, info.dataSize, info.bitsPerSample));
+        }
+
         if (info.audioFormat == 3 && info.bitsPerSample == 32) {
             int sampleCount = info.dataSize / 4;
             byte[] pcm = new byte[sampleCount * 2];
@@ -150,6 +155,40 @@ public class SustainedWavPlayer {
         }
 
         throw new IllegalStateException("Unsupported WAV format: format=" + info.audioFormat + ", bps=" + info.bitsPerSample);
+    }
+
+    private static byte[] convertIntegerPcmTo16(byte[] wavBytes, int dataOffset, int dataSize, int bitsPerSample) {
+        int bytesPerSample = bitsPerSample / 8;
+        if (bytesPerSample <= 0) {
+            throw new IllegalStateException("Invalid PCM bit depth: " + bitsPerSample);
+        }
+        int sampleCount = dataSize / bytesPerSample;
+        byte[] pcm16 = new byte[sampleCount * 2];
+        int in = dataOffset;
+        int out = 0;
+        for (int i = 0; i < sampleCount; i++) {
+            short s;
+            if (bitsPerSample == 8) {
+                int u8 = wavBytes[in] & 0xFF;
+                s = (short) ((u8 - 128) << 8);
+            } else if (bitsPerSample == 24) {
+                int b0 = wavBytes[in] & 0xFF;
+                int b1 = wavBytes[in + 1] & 0xFF;
+                int b2 = wavBytes[in + 2];
+                int sample24 = (b2 << 16) | (b1 << 8) | b0;
+                s = (short) (sample24 >> 8);
+            } else if (bitsPerSample == 32) {
+                int sample32 = littleEndianInt(wavBytes, in);
+                s = (short) (sample32 >> 16);
+            } else {
+                throw new IllegalStateException("Unsupported integer PCM depth: " + bitsPerSample);
+            }
+            pcm16[out] = (byte) (s & 0xFF);
+            pcm16[out + 1] = (byte) ((s >> 8) & 0xFF);
+            in += bytesPerSample;
+            out += 2;
+        }
+        return pcm16;
     }
 
     private static byte[] readAll(Context context, int rawResId) {
@@ -183,6 +222,7 @@ public class SustainedWavPlayer {
 
         int cursor = 12;
         int fmtOffset = -1;
+        int fmtSize = -1;
         int dataOffset = -1;
         int dataSize = -1;
 
@@ -191,6 +231,7 @@ public class SustainedWavPlayer {
             int payloadOffset = cursor + 8;
             if (isTag(bytes, cursor, "fmt ")) {
                 fmtOffset = payloadOffset;
+                fmtSize = chunkSize;
             } else if (isTag(bytes, cursor, "data")) {
                 dataOffset = payloadOffset;
                 dataSize = chunkSize;
@@ -203,10 +244,22 @@ public class SustainedWavPlayer {
             throw new IllegalStateException("Unsupported WAV structure");
         }
 
+        if (fmtOffset + Math.max(16, fmtSize) > bytes.length) {
+            throw new IllegalStateException("Corrupted fmt chunk");
+        }
+
         int audioFormat = littleEndianShort(bytes, fmtOffset);
         int channels = littleEndianShort(bytes, fmtOffset + 2);
         int sampleRate = littleEndianInt(bytes, fmtOffset + 4);
         int bitsPerSample = littleEndianShort(bytes, fmtOffset + 14);
+
+        if (audioFormat == 0xFFFE && fmtSize >= 40) {
+            int subFormatOffset = fmtOffset + 24;
+            int subFormatTag = littleEndianShort(bytes, subFormatOffset);
+            if (subFormatTag == 1 || subFormatTag == 3) {
+                audioFormat = subFormatTag;
+            }
+        }
 
         if (channels != 1 && channels != 2) {
             throw new IllegalStateException("Only mono/stereo WAV is supported");
