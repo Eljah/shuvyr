@@ -562,6 +562,33 @@ public class SustainedWavPlayer {
                 writeSample(pcm16, headFrame, ch, channelCount, blended);
             }
         }
+
+        // Локально убираем DC на стыках, чтобы снизить НЧ-хлопки.
+        removeLocalDc(pcm16, loopStart, loopStart + fadeFrames, channelCount);
+        removeLocalDc(pcm16, tailStart, loopEnd, channelCount);
+    }
+
+    private static void removeLocalDc(byte[] pcm16, int startFrame, int endFrame, int channelCount) {
+        int from = Math.max(0, startFrame);
+        int to = Math.max(from, endFrame);
+        int frames = to - from;
+        if (frames < 4) {
+            return;
+        }
+        for (int ch = 0; ch < channelCount; ch++) {
+            long sum = 0L;
+            for (int frame = from; frame < to; frame++) {
+                sum += readSample(pcm16, frame, ch, channelCount);
+            }
+            int mean = Math.round(sum / (float) frames);
+            if (mean == 0) {
+                continue;
+            }
+            for (int frame = from; frame < to; frame++) {
+                int sample = readSample(pcm16, frame, ch, channelCount);
+                writeSample(pcm16, frame, ch, channelCount, sample - mean);
+            }
+        }
     }
 
     private static int monoSample(byte[] pcm16, int frame, int channelCount) {
