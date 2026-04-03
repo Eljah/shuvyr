@@ -8,6 +8,7 @@ import android.media.audiofx.Visualizer;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 
@@ -22,6 +23,7 @@ import tatar.eljah.audio.PitchAnalyzer;
 import tatar.eljah.shuvyr.R;
 
 public class MainActivity extends AppCompatActivity implements ShuvyrGameView.OnFingeringChangeListener {
+    private static final String TAG = "MainActivity";
     private static final int SOUND_COUNT = 6;
     private static final int REQUEST_RECORD_AUDIO = 3301;
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
@@ -94,7 +96,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         };
 
         for (int i = 0; i < resources.length; i++) {
-            players[i] = new SustainedWavPlayer(this, resources[i]);
+            try {
+                players[i] = new SustainedWavPlayer(this, resources[i]);
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Failed to load sound resource index=" + i + ", resId=" + resources[i], e);
+            }
         }
 
         bindUiActions();
@@ -217,6 +223,9 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             return;
         }
         SustainedWavPlayer next = players[soundNumber - 1];
+        if (next == null) {
+            return;
+        }
         if (activeSoundNumber == -1) {
             stopPreviousReleaseIfAny();
             next.playSustain();
@@ -648,6 +657,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
             return;
         }
         SustainedWavPlayer active = players[activeSoundNumber - 1];
+        if (active == null) {
+            activeSoundNumber = -1;
+            return;
+        }
         active.stopWithRelease();
         releasingSoundNumber = activeSoundNumber;
     }
@@ -656,7 +669,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         if (releasingSoundNumber < 1 || releasingSoundNumber > SOUND_COUNT) {
             return;
         }
-        players[releasingSoundNumber - 1].hardStop();
+        SustainedWavPlayer releasing = players[releasingSoundNumber - 1];
+        if (releasing != null) {
+            releasing.hardStop();
+        }
         releasingSoundNumber = -1;
     }
 
@@ -664,7 +680,10 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         if (activeSoundNumber < 1 || activeSoundNumber > SOUND_COUNT) {
             return;
         }
-        players[activeSoundNumber - 1].hardStop();
+        SustainedWavPlayer active = players[activeSoundNumber - 1];
+        if (active != null) {
+            active.hardStop();
+        }
         activeSoundNumber = -1;
     }
 
