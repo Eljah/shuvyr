@@ -27,9 +27,20 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private static final int SOUND_COUNT = 6;
     private static final int REQUEST_RECORD_AUDIO = 3301;
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
+    // Верхние ноты (по аппликатуре): без зажатий, с 1 верхней дыркой, с 2 верхними дырками.
+    private static final int TOP_NOTE_1_STABLE_START_MS = 700;
+    private static final int TOP_NOTE_2_STABLE_START_MS = 600;
+    private static final int TOP_NOTE_3_STABLE_START_MS = 550;
     // Срез атаки (мс) для перехода в устойчивый участок при повторном старте ноты.
     // При первом входе после тишины играем с нуля (с атакой), при последующих — с этого смещения.
-    private static final int[] NOTE_STABLE_START_MS = new int[] {500, 290, 320, 280, 310, 300};
+    private static final int[] NOTE_STABLE_START_MS = new int[] {
+        TOP_NOTE_1_STABLE_START_MS,
+        TOP_NOTE_2_STABLE_START_MS,
+        TOP_NOTE_3_STABLE_START_MS,
+        280,
+        310,
+        300
+    };
 
     private enum SpectroAssistMode {
         OFF,
