@@ -25,6 +25,10 @@ public class SustainedWavPlayer {
     }
 
     public SustainedWavPlayer(Context context, int rawResId, int stableStartMs, int stableEndTrimMs) {
+        this(context, rawResId, stableStartMs, stableEndTrimMs, 0);
+    }
+
+    public SustainedWavPlayer(Context context, int rawResId, int stableStartMs, int stableEndTrimMs, int maxLoopMs) {
         byte[] wavData = readAll(context, rawResId);
         PcmData pcm = decodeToPcm16(wavData);
 
@@ -76,7 +80,7 @@ public class SustainedWavPlayer {
             }
         }
 
-        int[] loop = detectSustainLoop(loopSearchPcm, loopSearchFrames, pcm.sampleRate, pcm.channelCount);
+        int[] loop = detectSustainLoop(loopSearchPcm, loopSearchFrames, pcm.sampleRate, pcm.channelCount, maxLoopMs);
         loop[0] += frameOffset;
         loop[1] += frameOffset;
         smoothLoopBoundary(pcm.pcm16, loop[0], loop[1], pcm.sampleRate, pcm.channelCount);
@@ -354,7 +358,7 @@ public class SustainedWavPlayer {
         }
     }
 
-    private static int[] detectSustainLoop(byte[] pcm16, int totalFrames, int sampleRate, int channelCount) {
+    private static int[] detectSustainLoop(byte[] pcm16, int totalFrames, int sampleRate, int channelCount, int maxLoopMs) {
         if (totalFrames < 4) {
             return new int[] {0, Math.max(1, totalFrames - 1)};
         }
@@ -393,6 +397,10 @@ public class SustainedWavPlayer {
         int start = findNearestZeroCrossing(pcm16, rawStart, channelCount, -search, search, totalFrames);
         int minLoop = Math.max(approxPeriod * 8, sampleRate / 8);
         int maxLoop = Math.max(minLoop + approxPeriod * 2, sampleRate);
+        if (maxLoopMs > 0) {
+            int limitedMaxLoop = Math.max(minLoop + 1, Math.round((maxLoopMs / 1000f) * sampleRate));
+            maxLoop = Math.min(maxLoop, limitedMaxLoop);
+        }
         int targetEnd = Math.max(start + minLoop, rawEnd);
         int end = findBestLoopEnd(pcm16, start, targetEnd, approxPeriod, minLoop, maxLoop, channelCount, totalFrames);
 

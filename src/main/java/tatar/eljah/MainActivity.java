@@ -35,6 +35,11 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private static final int TOP_NOTE_1_STABLE_END_TRIM_MS = 200;
     private static final int TOP_NOTE_2_STABLE_END_TRIM_MS = 340;
     private static final int TOP_NOTE_3_STABLE_END_TRIM_MS = 480;
+    // Для верхних нот ограничиваем максимальную длину цикла:
+    // короткий периодический луп заметно снижает биения на стыках.
+    private static final int TOP_NOTE_1_MAX_LOOP_MS = 220;
+    private static final int TOP_NOTE_2_MAX_LOOP_MS = 260;
+    private static final int TOP_NOTE_3_MAX_LOOP_MS = 300;
     // Срез атаки (мс) для перехода в устойчивый участок при повторном старте ноты.
     // При первом входе после тишины играем с нуля (с атакой), при последующих — с этого смещения.
     private static final int[] NOTE_STABLE_START_MS = new int[] {
@@ -49,6 +54,14 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         TOP_NOTE_1_STABLE_END_TRIM_MS,
         TOP_NOTE_2_STABLE_END_TRIM_MS,
         TOP_NOTE_3_STABLE_END_TRIM_MS,
+        0,
+        0,
+        0
+    };
+    private static final int[] NOTE_MAX_LOOP_MS = new int[] {
+        TOP_NOTE_1_MAX_LOOP_MS,
+        TOP_NOTE_2_MAX_LOOP_MS,
+        TOP_NOTE_3_MAX_LOOP_MS,
         0,
         0,
         0
@@ -127,7 +140,8 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
                     this,
                     resources[i],
                     NOTE_STABLE_START_MS[i],
-                    NOTE_STABLE_END_TRIM_MS[i]
+                    NOTE_STABLE_END_TRIM_MS[i],
+                    NOTE_MAX_LOOP_MS[i]
                 );
             } catch (RuntimeException e) {
                 Log.e(TAG, "Failed to load sound resource index=" + i + ", resId=" + resources[i], e);
