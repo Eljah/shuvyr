@@ -513,21 +513,45 @@ public class SustainedWavPlayer {
         if (loopLength < 8) {
             return;
         }
-        int fadeFrames = Math.min(loopLength / 4, Math.max(64, sampleRate / 80));
+        int fadeFrames = Math.min(loopLength / 3, Math.max(96, sampleRate / 40));
         if (fadeFrames < 8) {
             return;
         }
 
         int tailStart = loopEnd - fadeFrames;
+        // Выравниваем DC-смещение хвоста и головы перед кроссфейдом,
+        // чтобы уменьшить "дыхание"/биения на шве цикла.
+        for (int ch = 0; ch < channelCount; ch++) {
+            long headSum = 0L;
+            long tailSum = 0L;
+            for (int i = 0; i < fadeFrames; i++) {
+                headSum += readSample(pcm16, loopStart + i, ch, channelCount);
+                tailSum += readSample(pcm16, tailStart + i, ch, channelCount);
+            }
+            int headMean = Math.round(headSum / (float) fadeFrames);
+            int tailMean = Math.round(tailSum / (float) fadeFrames);
+            int dcDelta = headMean - tailMean;
+            if (dcDelta != 0) {
+                for (int i = 0; i < fadeFrames; i++) {
+                    int tailFrame = tailStart + i;
+                    int sample = readSample(pcm16, tailFrame, ch, channelCount);
+                    writeSample(pcm16, tailFrame, ch, channelCount, sample + dcDelta);
+                }
+            }
+        }
+
         for (int i = 0; i < fadeFrames; i++) {
             float t = (i + 1f) / (fadeFrames + 1f);
             int headFrame = loopStart + i;
             int tailFrame = tailStart + i;
             for (int ch = 0; ch < channelCount; ch++) {
-                int from = readSample(pcm16, tailFrame, ch, channelCount);
-                int to = readSample(pcm16, headFrame, ch, channelCount);
-                int blended = Math.round(from * (1f - t) + to * t);
+                int tail = readSample(pcm16, tailFrame, ch, channelCount);
+                int head = readSample(pcm16, headFrame, ch, channelCount);
+                float outTail = tail * (1f - t) + head * t;
+                float outHead = head * (1f - t) + tail * t;
+                int blended = Math.round((outTail + outHead) * 0.5f);
                 writeSample(pcm16, tailFrame, ch, channelCount, blended);
+                writeSample(pcm16, headFrame, ch, channelCount, blended);
             }
         }
     }
