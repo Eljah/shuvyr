@@ -27,6 +27,9 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private static final int SOUND_COUNT = 6;
     private static final int REQUEST_RECORD_AUDIO = 3301;
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
+    // Срез атаки (мс) для перехода в устойчивый участок при повторном старте ноты.
+    // При первом входе после тишины играем с нуля (с атакой), при последующих — с этого смещения.
+    private static final int[] NOTE_STABLE_START_MS = new int[] {500, 290, 320, 280, 310, 300};
 
     private enum SpectroAssistMode {
         OFF,
@@ -97,7 +100,7 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
         for (int i = 0; i < resources.length; i++) {
             try {
-                players[i] = new SustainedWavPlayer(this, resources[i]);
+                players[i] = new SustainedWavPlayer(this, resources[i], NOTE_STABLE_START_MS[i]);
             } catch (RuntimeException e) {
                 Log.e(TAG, "Failed to load sound resource index=" + i + ", resId=" + resources[i], e);
             }
