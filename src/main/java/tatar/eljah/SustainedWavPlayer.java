@@ -17,6 +17,18 @@ public class SustainedWavPlayer {
     private final int loopEndFrame;
 
     public SustainedWavPlayer(Context context, int rawResId) {
+        this(context, rawResId, 0);
+    }
+
+    public SustainedWavPlayer(Context context, int rawResId, int stableStartMs) {
+        this(context, rawResId, stableStartMs, 0);
+    }
+
+    public SustainedWavPlayer(Context context, int rawResId, int stableStartMs, int stableEndTrimMs) {
+        this(context, rawResId, stableStartMs, stableEndTrimMs, 0);
+    }
+
+    public SustainedWavPlayer(Context context, int rawResId, int stableStartMs, int stableEndTrimMs, int maxLoopMs) {
         byte[] wavData = readAll(context, rawResId);
         PcmData pcm = decodeToPcm16(wavData);
 
@@ -41,7 +53,36 @@ public class SustainedWavPlayer {
         int written = track.write(pcm.pcm16, 0, pcm.pcm16.length);
         int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
-        int[] loop = detectSustainLoop(pcm.pcm16, totalFrames, pcm.sampleRate, pcm.channelCount);
+        int stableStartFrames = Math.max(0, (int) Math.round((stableStartMs / 1000f) * pcm.sampleRate));
+        int stableEndTrimFrames = Math.max(0, (int) Math.round((stableEndTrimMs / 1000f) * pcm.sampleRate));
+        int constrainedStartFrame = Math.max(0, Math.min(totalFrames - 2, stableStartFrames));
+        int constrainedEndFrameExclusive = Math.max(constrainedStartFrame + 2, totalFrames - stableEndTrimFrames);
+        constrainedEndFrameExclusive = Math.min(totalFrames, constrainedEndFrameExclusive);
+
+        byte[] loopSearchPcm = pcm.pcm16;
+        int loopSearchFrames = totalFrames;
+        int frameOffset = 0;
+        if (constrainedStartFrame > 0 || constrainedEndFrameExclusive < totalFrames) {
+            frameOffset = constrainedStartFrame;
+            loopSearchFrames = constrainedEndFrameExclusive - constrainedStartFrame;
+            if (loopSearchFrames < 4) {
+                frameOffset = 0;
+                loopSearchFrames = totalFrames;
+            } else {
+                loopSearchPcm = new byte[loopSearchFrames * bytesPerFrame];
+                System.arraycopy(
+                    pcm.pcm16,
+                    constrainedStartFrame * bytesPerFrame,
+                    loopSearchPcm,
+                    0,
+                    loopSearchPcm.length
+                );
+            }
+        }
+
+        int[] loop = detectSustainLoop(loopSearchPcm, loopSearchFrames, pcm.sampleRate, pcm.channelCount, maxLoopMs);
+        loop[0] += frameOffset;
+        loop[1] += frameOffset;
         smoothLoopBoundary(pcm.pcm16, loop[0], loop[1], pcm.sampleRate, pcm.channelCount);
         loopStartFrame = loop[0];
         loopEndFrame = loop[1];
@@ -317,7 +358,7 @@ public class SustainedWavPlayer {
         }
     }
 
-    private static int[] detectSustainLoop(byte[] pcm16, int totalFrames, int sampleRate, int channelCount) {
+    private static int[] detectSustainLoop(byte[] pcm16, int totalFrames, int sampleRate, int channelCount, int maxLoopMs) {
         if (totalFrames < 4) {
             return new int[] {0, Math.max(1, totalFrames - 1)};
         }
@@ -356,6 +397,10 @@ public class SustainedWavPlayer {
         int start = findNearestZeroCrossing(pcm16, rawStart, channelCount, -search, search, totalFrames);
         int minLoop = Math.max(approxPeriod * 8, sampleRate / 8);
         int maxLoop = Math.max(minLoop + approxPeriod * 2, sampleRate);
+        if (maxLoopMs > 0) {
+            int limitedMaxLoop = Math.max(minLoop + 1, Math.round((maxLoopMs / 1000f) * sampleRate));
+            maxLoop = Math.min(maxLoop, limitedMaxLoop);
+        }
         int targetEnd = Math.max(start + minLoop, rawEnd);
         int end = findBestLoopEnd(pcm16, start, targetEnd, approxPeriod, minLoop, maxLoop, channelCount, totalFrames);
 
@@ -476,21 +521,72 @@ public class SustainedWavPlayer {
         if (loopLength < 8) {
             return;
         }
-        int fadeFrames = Math.min(loopLength / 4, Math.max(64, sampleRate / 80));
+        int fadeFrames = Math.min(loopLength / 3, Math.max(96, sampleRate / 40));
         if (fadeFrames < 8) {
             return;
         }
 
         int tailStart = loopEnd - fadeFrames;
+        // Выравниваем DC-смещение хвоста и головы перед кроссфейдом,
+        // чтобы уменьшить "дыхание"/биения на шве цикла.
+        for (int ch = 0; ch < channelCount; ch++) {
+            long headSum = 0L;
+            long tailSum = 0L;
+            for (int i = 0; i < fadeFrames; i++) {
+                headSum += readSample(pcm16, loopStart + i, ch, channelCount);
+                tailSum += readSample(pcm16, tailStart + i, ch, channelCount);
+            }
+            int headMean = Math.round(headSum / (float) fadeFrames);
+            int tailMean = Math.round(tailSum / (float) fadeFrames);
+            int dcDelta = headMean - tailMean;
+            if (dcDelta != 0) {
+                for (int i = 0; i < fadeFrames; i++) {
+                    int tailFrame = tailStart + i;
+                    int sample = readSample(pcm16, tailFrame, ch, channelCount);
+                    writeSample(pcm16, tailFrame, ch, channelCount, sample + dcDelta);
+                }
+            }
+        }
+
         for (int i = 0; i < fadeFrames; i++) {
             float t = (i + 1f) / (fadeFrames + 1f);
             int headFrame = loopStart + i;
             int tailFrame = tailStart + i;
             for (int ch = 0; ch < channelCount; ch++) {
-                int from = readSample(pcm16, tailFrame, ch, channelCount);
-                int to = readSample(pcm16, headFrame, ch, channelCount);
-                int blended = Math.round(from * (1f - t) + to * t);
+                int tail = readSample(pcm16, tailFrame, ch, channelCount);
+                int head = readSample(pcm16, headFrame, ch, channelCount);
+                float outTail = tail * (1f - t) + head * t;
+                float outHead = head * (1f - t) + tail * t;
+                int blended = Math.round((outTail + outHead) * 0.5f);
                 writeSample(pcm16, tailFrame, ch, channelCount, blended);
+                writeSample(pcm16, headFrame, ch, channelCount, blended);
+            }
+        }
+
+        // Локально убираем DC на стыках, чтобы снизить НЧ-хлопки.
+        removeLocalDc(pcm16, loopStart, loopStart + fadeFrames, channelCount);
+        removeLocalDc(pcm16, tailStart, loopEnd, channelCount);
+    }
+
+    private static void removeLocalDc(byte[] pcm16, int startFrame, int endFrame, int channelCount) {
+        int from = Math.max(0, startFrame);
+        int to = Math.max(from, endFrame);
+        int frames = to - from;
+        if (frames < 4) {
+            return;
+        }
+        for (int ch = 0; ch < channelCount; ch++) {
+            long sum = 0L;
+            for (int frame = from; frame < to; frame++) {
+                sum += readSample(pcm16, frame, ch, channelCount);
+            }
+            int mean = Math.round(sum / (float) frames);
+            if (mean == 0) {
+                continue;
+            }
+            for (int frame = from; frame < to; frame++) {
+                int sample = readSample(pcm16, frame, ch, channelCount);
+                writeSample(pcm16, frame, ch, channelCount, sample - mean);
             }
         }
     }
