@@ -49,17 +49,36 @@ public class SustainedWavPlayer {
         int written = track.write(pcm.pcm16, 0, pcm.pcm16.length);
         int bytesPerFrame = pcm.channelCount * 2;
         int totalFrames = Math.max(1, written / bytesPerFrame);
-        int[] loop = detectSustainLoop(pcm.pcm16, totalFrames, pcm.sampleRate, pcm.channelCount);
         int stableStartFrames = Math.max(0, (int) Math.round((stableStartMs / 1000f) * pcm.sampleRate));
-        if (stableStartFrames > 0 && loop[0] < stableStartFrames) {
-            loop[0] = Math.min(Math.max(0, totalFrames - 2), stableStartFrames);
-            loop[1] = Math.max(loop[0] + 1, loop[1]);
-        }
         int stableEndTrimFrames = Math.max(0, (int) Math.round((stableEndTrimMs / 1000f) * pcm.sampleRate));
-        if (stableEndTrimFrames > 0) {
-            int stableEndFrame = Math.max(loop[0] + 1, totalFrames - stableEndTrimFrames);
-            loop[1] = Math.max(loop[0] + 1, Math.min(loop[1], stableEndFrame));
+        int constrainedStartFrame = Math.max(0, Math.min(totalFrames - 2, stableStartFrames));
+        int constrainedEndFrameExclusive = Math.max(constrainedStartFrame + 2, totalFrames - stableEndTrimFrames);
+        constrainedEndFrameExclusive = Math.min(totalFrames, constrainedEndFrameExclusive);
+
+        byte[] loopSearchPcm = pcm.pcm16;
+        int loopSearchFrames = totalFrames;
+        int frameOffset = 0;
+        if (constrainedStartFrame > 0 || constrainedEndFrameExclusive < totalFrames) {
+            frameOffset = constrainedStartFrame;
+            loopSearchFrames = constrainedEndFrameExclusive - constrainedStartFrame;
+            if (loopSearchFrames < 4) {
+                frameOffset = 0;
+                loopSearchFrames = totalFrames;
+            } else {
+                loopSearchPcm = new byte[loopSearchFrames * bytesPerFrame];
+                System.arraycopy(
+                    pcm.pcm16,
+                    constrainedStartFrame * bytesPerFrame,
+                    loopSearchPcm,
+                    0,
+                    loopSearchPcm.length
+                );
+            }
         }
+
+        int[] loop = detectSustainLoop(loopSearchPcm, loopSearchFrames, pcm.sampleRate, pcm.channelCount);
+        loop[0] += frameOffset;
+        loop[1] += frameOffset;
         smoothLoopBoundary(pcm.pcm16, loop[0], loop[1], pcm.sampleRate, pcm.channelCount);
         loopStartFrame = loop[0];
         loopEndFrame = loop[1];
