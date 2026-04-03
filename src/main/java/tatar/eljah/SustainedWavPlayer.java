@@ -21,6 +21,10 @@ public class SustainedWavPlayer {
     }
 
     public SustainedWavPlayer(Context context, int rawResId, int stableStartMs) {
+        this(context, rawResId, stableStartMs, 0);
+    }
+
+    public SustainedWavPlayer(Context context, int rawResId, int stableStartMs, int stableEndTrimMs) {
         byte[] wavData = readAll(context, rawResId);
         PcmData pcm = decodeToPcm16(wavData);
 
@@ -50,6 +54,11 @@ public class SustainedWavPlayer {
         if (stableStartFrames > 0 && loop[0] < stableStartFrames) {
             loop[0] = Math.min(Math.max(0, totalFrames - 2), stableStartFrames);
             loop[1] = Math.max(loop[0] + 1, loop[1]);
+        }
+        int stableEndTrimFrames = Math.max(0, (int) Math.round((stableEndTrimMs / 1000f) * pcm.sampleRate));
+        if (stableEndTrimFrames > 0) {
+            int stableEndFrame = Math.max(loop[0] + 1, totalFrames - stableEndTrimFrames);
+            loop[1] = Math.max(loop[0] + 1, Math.min(loop[1], stableEndFrame));
         }
         smoothLoopBoundary(pcm.pcm16, loop[0], loop[1], pcm.sampleRate, pcm.channelCount);
         loopStartFrame = loop[0];

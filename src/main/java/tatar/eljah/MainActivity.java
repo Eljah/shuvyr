@@ -28,9 +28,13 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
     private static final int REQUEST_RECORD_AUDIO = 3301;
     private static final float[] NOTE_BASE_HZ = new float[] {160f, 98f, 538f, 496f, 469f, 96f};
     // Верхние ноты (по аппликатуре): без зажатий, с 1 верхней дыркой, с 2 верхними дырками.
-    private static final int TOP_NOTE_1_STABLE_START_MS = 700;
-    private static final int TOP_NOTE_2_STABLE_START_MS = 600;
-    private static final int TOP_NOTE_3_STABLE_START_MS = 550;
+    private static final int TOP_NOTE_1_STABLE_START_MS = 875;
+    private static final int TOP_NOTE_2_STABLE_START_MS = 575;
+    private static final int TOP_NOTE_3_STABLE_START_MS = 450;
+    // Дополнительный срез с хвоста для верхних нот, чтобы убрать нестабильный задний фронт.
+    private static final int TOP_NOTE_1_STABLE_END_TRIM_MS = 200;
+    private static final int TOP_NOTE_2_STABLE_END_TRIM_MS = 340;
+    private static final int TOP_NOTE_3_STABLE_END_TRIM_MS = 480;
     // Срез атаки (мс) для перехода в устойчивый участок при повторном старте ноты.
     // При первом входе после тишины играем с нуля (с атакой), при последующих — с этого смещения.
     private static final int[] NOTE_STABLE_START_MS = new int[] {
@@ -40,6 +44,14 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
         280,
         310,
         300
+    };
+    private static final int[] NOTE_STABLE_END_TRIM_MS = new int[] {
+        TOP_NOTE_1_STABLE_END_TRIM_MS,
+        TOP_NOTE_2_STABLE_END_TRIM_MS,
+        TOP_NOTE_3_STABLE_END_TRIM_MS,
+        0,
+        0,
+        0
     };
 
     private enum SpectroAssistMode {
@@ -111,7 +123,12 @@ public class MainActivity extends AppCompatActivity implements ShuvyrGameView.On
 
         for (int i = 0; i < resources.length; i++) {
             try {
-                players[i] = new SustainedWavPlayer(this, resources[i], NOTE_STABLE_START_MS[i]);
+                players[i] = new SustainedWavPlayer(
+                    this,
+                    resources[i],
+                    NOTE_STABLE_START_MS[i],
+                    NOTE_STABLE_END_TRIM_MS[i]
+                );
             } catch (RuntimeException e) {
                 Log.e(TAG, "Failed to load sound resource index=" + i + ", resId=" + resources[i], e);
             }
