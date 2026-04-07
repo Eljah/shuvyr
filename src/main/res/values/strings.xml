@@ -110,4 +110,16 @@
     <string name="current_note_template">Текущая нота: %1$s · закрыто отверстий: %2$d</string>
     <string name="main_spectro_tune_mode">Spectrogram: tune mode</string>
     <string name="main_spectro_demo_mode">Spectrogram: demo mode</string>
+    <string name="main_trainer">Тренажер мелодии</string>
+
+    <string name="trainer_title">Тренажер аппликатуры</string>
+    <string name="trainer_start">Старт</string>
+    <string name="trainer_pause">Пауза</string>
+    <string name="trainer_ready">Выберите мелодию и нажмите «Старт».</string>
+    <string name="trainer_step_open">Шаг %1$d: открытое звучание (без зажатия).</string>
+    <string name="trainer_step_close">Шаг %1$d: зажмите дырку №%2$d.</string>
+
+    <string-array name="trainer_melodies">
+        <item>Game of Thrones (demo)</item>
+    </string-array>
 </resources>
